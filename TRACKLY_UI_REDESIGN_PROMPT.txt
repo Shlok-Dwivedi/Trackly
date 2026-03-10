@@ -1,0 +1,500 @@
+================================================================================
+TRACKLY — FULL UI REDESIGN + GOOGLE CALENDAR INTEGRATION PROMPT
+================================================================================
+
+You are working on Trackly, an NGO event management system.
+Tech stack: React + Vite + TypeScript + Tailwind CSS + shadcn/ui
+Firebase Auth + Firestore (v9 modular SDK), Supabase Storage.
+
+I am giving you two reference UI files:
+- trackly-desktop.jsx — desktop UI reference prototype
+- trackly-mobile.jsx  — mobile UI reference prototype
+
+Your job is to apply this design system to the entire Trackly codebase
+AND add Google Calendar OAuth integration.
+
+================================================================================
+PART 1 — DESIGN SYSTEM (apply to ALL pages)
+================================================================================
+
+Step 1: Create src/lib/theme.ts with these exact design tokens:
+
+export const COLORS = {
+  teal: "#0d9488",
+  tealLight: "#ccfbf1",
+  tealDark: "#0f766e",
+  amber: "#f59e0b",
+  amberLight: "#fef3c7",
+  blue: "#3b82f6",
+  blueLight: "#dbeafe",
+  green: "#22c55e",
+  greenLight: "#dcfce7",
+  red: "#ef4444",
+  redLight: "#fee2e2",
+  grey: "#9ca3af",
+  greyLight: "#f3f4f6",
+  purple: "#8b5cf6",
+  orange: "#f97316",
+  pink: "#ec4899",
+  bg: "#f8fafc",
+  card: "#ffffff",
+  border: "#e2e8f0",
+  text: "#0f172a",
+  textMuted: "#64748b",
+  sidebar: "#0f172a",
+  sidebarText: "#94a3b8",
+  sidebarActive: "#1e293b",
+}
+
+export const CATEGORY_COLORS: Record<string, string> = {
+  Workshop: "#8b5cf6",
+  Training: "#3b82f6",
+  Outreach: "#f97316",
+  Meeting: "#0d9488",
+  "Community Event": "#ec4899",
+  Sports: "#16a34a",
+  Seminar: "#6366f1",
+  Other: "#9ca3af",
+}
+
+export const STATUS_COLORS: Record<string, { color: string; bg: string }> = {
+  Planned:   { color: "#3b82f6", bg: "#dbeafe" },
+  Ongoing:   { color: "#f59e0b", bg: "#fef3c7" },
+  Completed: { color: "#22c55e", bg: "#dcfce7" },
+  Cancelled: { color: "#ef4444", bg: "#fee2e2" },
+}
+
+Step 2: Create/update these shared components matching the reference UI exactly:
+
+src/components/ui/StatusBadge.tsx
+  - Colored pill with dot + text
+  - Uses STATUS_COLORS from theme.ts
+  - Handles: Planned, Ongoing, Completed, Cancelled
+
+src/components/ui/CategoryTag.tsx
+  - Colored pill using CATEGORY_COLORS from theme.ts
+
+src/components/ui/Avatar.tsx
+  - Circular div with first letter of name
+  - Props: name, size, color
+
+src/components/EventCard.tsx
+  - Card with: title, StatusBadge, CategoryTag, date, location, assignee count, photo count
+  - Truncate description to 100 chars — if value is a plain number show "No description"
+  - onClick navigates to event detail
+
+src/components/MiniCalendar.tsx
+  - Compact monthly calendar
+  - Event count notification bubble top-right corner of date cell
+    (position: absolute, top: -5px, right: -4px, 17px circle)
+  - Badge color: Completed=green+checkmark, Ongoing=amber+count, Planned=blue+count
+  - Upcoming events list below grid (3 items, colored dot + title + date + status indicator)
+  - "View full calendar" link at bottom
+
+Step 3: Update LAYOUT to be fully responsive:
+
+src/components/Layout.tsx (or equivalent):
+  DESKTOP (>= 768px):
+    - Fixed sidebar 230px wide (dark #0f172a)
+    - Sidebar has: logo, nav links with active state (teal left border + highlight),
+      notification bell with red badge, user avatar + name, logout
+    - Sticky topbar with page title and page switcher buttons
+    - Content area: margin-left 230px, padding 28px 32px
+
+  MOBILE (< 768px):
+    - NO sidebar — hidden completely
+    - Sticky top bar: Trackly logo left, notification bell + avatar right
+    - Fixed bottom navigation with 5 tabs: Home, Calendar, Events, Profile, More
+    - Active tab: teal color + dot indicator below icon
+    - Content area: padding 14px, full width
+
+  TRANSITION: Use Tailwind md: breakpoint classes throughout.
+  Never use window.innerWidth — use CSS breakpoints only.
+
+Step 4: Update these pages to match reference UI:
+
+Dashboard (src/pages/Dashboard.tsx):
+  - Welcome message + New Event button
+  - Google Calendar connect card (see Part 2)
+  - Top row: MiniCalendar (60%) + Today's Events card (40%), side by side on desktop, stacked on mobile
+  - 4 stat cards in row (Total, Planned, Ongoing, Completed)
+  - Charts row: donut chart (Events by Status) + bar chart (Events per Month)
+  - Upcoming This Week: 3-column grid on desktop, 1-column on mobile
+
+Events List (src/pages/EventsList.tsx):
+  - Search bar full width
+  - Filter pills: All, Planned, Ongoing, Completed, Cancelled
+  - Event count shown ("X events")
+  - Grid: 3 columns desktop, 1 column mobile
+  - Empty state card when no results
+
+Event Detail (src/pages/EventDetail.tsx):
+  - Back button
+  - Title + badges row + Edit/Delete buttons
+  - Desktop: 2-column (2fr 1fr) — main content left, sidebar right
+  - Mobile: single column stacked
+  - Main: description, date/location details, photos grid
+  - Sidebar: enrollment card, attendees list, Google Calendar export, status history
+  - Cancel Event button (Admin only, red border card at bottom)
+
+Create Event / Edit Event:
+  - Clean form card, max-width 680px centered
+  - Grid layout for date fields (2 columns)
+  - Enrollment settings section with divider
+  - Assign To: search input + chip display for selected users
+  - Tags input
+
+Profile (src/pages/Profile.tsx):
+  - Desktop: 2-column (1fr 2fr) — info card left, stats + events right
+  - Mobile: stacked
+  - Notification preference toggles (teal toggle switches)
+
+Users (src/pages/Users.tsx):
+  - Full-width table with columns: User, Email, Department, Assign Role, Current Role, Actions
+  - Role badge with color per role (admin=teal, staff=blue, volunteer=amber, viewer=grey)
+  - Assign + View Profile buttons per row
+  - Mobile: card list instead of table
+
+Reports (src/pages/Reports.tsx):
+  - 3 stat cards
+  - 2-column chart row
+  - Full events table with Export PDF + Export CSV buttons
+
+Calendar (src/pages/Calendar.tsx):
+  - Month/Week/List view toggle
+  - My Events toggle button (teal pill)
+  - Month view: full grid, event pills with colored left border by category
+  - List view: grouped by date with colored left accent bar
+  - Mobile: default to List view
+  - Category color legend at bottom
+
+================================================================================
+PART 2 — GOOGLE CALENDAR OAUTH INTEGRATION
+================================================================================
+
+The goal: let each user connect their personal Google Calendar account
+so Trackly events automatically appear in their own Google Calendar.
+
+This uses Google OAuth (the user signs in with Google and grants Calendar access).
+This is SEPARATE from the existing Google Sign-In for Trackly auth.
+
+--- SETUP STEPS (do these in code, document in comments) ---
+
+1. In Google Cloud Console (user must do this manually):
+   - Enable Google Calendar API
+   - Add OAuth scope: https://www.googleapis.com/auth/calendar.events
+   - Add authorized redirect URI: http://localhost:8080/auth/google/callback
+     (and later: https://trackly.vercel.app/auth/google/callback)
+   - Copy Client ID to VITE_GOOGLE_CLIENT_ID in .env
+
+2. Create src/lib/googleCalendar.ts:
+
+```typescript
+const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID
+const SCOPES = 'https://www.googleapis.com/auth/calendar.events'
+const REDIRECT_URI = window.location.origin + '/auth/google/callback'
+
+// Start OAuth flow
+export function connectGoogleCalendar() {
+  const params = new URLSearchParams({
+    client_id: GOOGLE_CLIENT_ID,
+    redirect_uri: REDIRECT_URI,
+    response_type: 'token',  // implicit flow — no backend needed
+    scope: SCOPES,
+    prompt: 'consent',
+  })
+  window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?${params}`
+}
+
+// Handle OAuth callback — call this on /auth/google/callback route
+export function handleGoogleCallback(): string | null {
+  const hash = window.location.hash.substring(1)
+  const params = new URLSearchParams(hash)
+  const token = params.get('access_token')
+  if (token) {
+    localStorage.setItem('google_calendar_token', token)
+    // Save expiry
+    const expiresIn = params.get('expires_in')
+    const expiry = Date.now() + (parseInt(expiresIn || '3600') * 1000)
+    localStorage.setItem('google_calendar_token_expiry', expiry.toString())
+  }
+  return token
+}
+
+// Check if user has connected Google Calendar
+export function isGoogleCalendarConnected(): boolean {
+  const token = localStorage.getItem('google_calendar_token')
+  const expiry = localStorage.getItem('google_calendar_token_expiry')
+  if (!token || !expiry) return false
+  return Date.now() < parseInt(expiry)
+}
+
+// Disconnect
+export function disconnectGoogleCalendar() {
+  localStorage.removeItem('google_calendar_token')
+  localStorage.removeItem('google_calendar_token_expiry')
+}
+
+// Get stored token
+export function getGoogleCalendarToken(): string | null {
+  if (!isGoogleCalendarConnected()) return null
+  return localStorage.getItem('google_calendar_token')
+}
+
+// Create event in user's Google Calendar
+export async function createGoogleCalendarEvent(event: {
+  title: string
+  description: string
+  location: string
+  startDate: Date
+  endDate: Date
+}) {
+  const token = getGoogleCalendarToken()
+  if (!token) throw new Error('Google Calendar not connected')
+
+  const body = {
+    summary: event.title,
+    description: event.description,
+    location: event.location,
+    start: {
+      dateTime: event.startDate.toISOString(),
+      timeZone: 'Asia/Kolkata',
+    },
+    end: {
+      dateTime: event.endDate.toISOString(),
+      timeZone: 'Asia/Kolkata',
+    },
+  }
+
+  const response = await fetch(
+    'https://www.googleapis.com/calendar/v3/calendars/primary/events',
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    }
+  )
+
+  if (!response.ok) {
+    const error = await response.json()
+    throw new Error(error.error?.message || 'Failed to create calendar event')
+  }
+
+  return response.json() // returns created event with id
+}
+
+// Update existing Google Calendar event
+export async function updateGoogleCalendarEvent(googleEventId: string, event: {
+  title: string
+  description: string
+  location: string
+  startDate: Date
+  endDate: Date
+}) {
+  const token = getGoogleCalendarToken()
+  if (!token) throw new Error('Google Calendar not connected')
+
+  const body = {
+    summary: event.title,
+    description: event.description,
+    location: event.location,
+    start: { dateTime: event.startDate.toISOString(), timeZone: 'Asia/Kolkata' },
+    end: { dateTime: event.endDate.toISOString(), timeZone: 'Asia/Kolkata' },
+  }
+
+  const response = await fetch(
+    `https://www.googleapis.com/calendar/v3/calendars/primary/events/${googleEventId}`,
+    {
+      method: 'PUT',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    }
+  )
+
+  if (!response.ok) throw new Error('Failed to update calendar event')
+  return response.json()
+}
+
+// Delete event from Google Calendar
+export async function deleteGoogleCalendarEvent(googleEventId: string) {
+  const token = getGoogleCalendarToken()
+  if (!token) return
+
+  await fetch(
+    `https://www.googleapis.com/calendar/v3/calendars/primary/events/${googleEventId}`,
+    {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` },
+    }
+  )
+}
+```
+
+3. Add OAuth callback route in src/App.tsx:
+```typescript
+<Route path="/auth/google/callback" element={<GoogleCalendarCallback />} />
+```
+
+4. Create src/pages/GoogleCalendarCallback.tsx:
+```typescript
+import { useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { handleGoogleCallback } from '@/lib/googleCalendar'
+
+export default function GoogleCalendarCallback() {
+  const navigate = useNavigate()
+  useEffect(() => {
+    const token = handleGoogleCallback()
+    if (token) {
+      // Show success toast then redirect
+      setTimeout(() => navigate('/dashboard'), 1500)
+    } else {
+      navigate('/dashboard')
+    }
+  }, [])
+  return (
+    <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'100vh' }}>
+      <div>✅ Google Calendar connected! Redirecting...</div>
+    </div>
+  )
+}
+```
+
+5. Create src/components/GoogleCalendarCard.tsx:
+```typescript
+// Shows connect/disconnect state on Dashboard
+// Connected state: green border, "events sync automatically", Disconnect + Export All + Sync Settings buttons + "Last synced: X min ago"
+// Disconnected state: "Connect Google Calendar" blue button
+// Import connectGoogleCalendar, disconnectGoogleCalendar, isGoogleCalendarConnected from @/lib/googleCalendar
+```
+
+6. In EventDetail.tsx — update Export button:
+```typescript
+import { createGoogleCalendarEvent, isGoogleCalendarConnected } from '@/lib/googleCalendar'
+
+// On Export button click:
+const handleExport = async () => {
+  if (!isGoogleCalendarConnected()) {
+    // Show toast: "Connect Google Calendar first"
+    return
+  }
+  try {
+    const startDate = event.startDate.toDate ? event.startDate.toDate() : new Date(event.startDate)
+    const endDate = event.endDate.toDate ? event.endDate.toDate() : new Date(event.endDate)
+    const result = await createGoogleCalendarEvent({
+      title: event.title,
+      description: event.description || '',
+      location: event.location || '',
+      startDate,
+      endDate,
+    })
+    // Save googleCalendarEventId to Firestore
+    await updateDoc(doc(db, 'events', event.id), {
+      googleCalendarEventId: result.id
+    })
+    toast.success('Event exported to Google Calendar ✅')
+  } catch (err) {
+    toast.error('Export failed: ' + err.message)
+  }
+}
+```
+
+7. Add VITE_GOOGLE_CLIENT_ID to .env:
+```
+VITE_GOOGLE_CLIENT_ID=your_google_client_id_here
+```
+
+================================================================================
+PART 3 — DATE HANDLING FIX (critical)
+================================================================================
+
+In EventCreate.tsx and EventEdit.tsx, always save dates as Firestore Timestamps:
+```typescript
+import { Timestamp } from 'firebase/firestore'
+
+// When saving event:
+startDate: Timestamp.fromMillis(new Date(formData.startDate).getTime()),
+endDate: Timestamp.fromMillis(new Date(formData.endDate).getTime()),
+status: 'Planned', // always include this field
+statusHistory: [{
+  status: 'Planned',
+  changedBy: 'system',
+  changedAt: Timestamp.now(),
+  note: 'Event created'
+}],
+```
+
+Create a helper in src/lib/utils.ts:
+```typescript
+export const toDate = (val: any): Date => {
+  if (!val) return new Date()
+  if (typeof val === 'number') return new Date(val)
+  if (val.toDate) return val.toDate()
+  if (val.seconds) return new Date(val.seconds * 1000)
+  return new Date(val)
+}
+```
+
+Use toDate() everywhere instead of .toDate() directly:
+- useEvents.ts autoUpdateEventStatus
+- Dashboard.tsx date formatting
+- EventCard.tsx date display
+- EventDetail.tsx date display
+- Calendar.tsx event positioning
+
+================================================================================
+PART 4 — CAPACITOR READINESS (do these now to avoid rework later)
+================================================================================
+
+1. Never use window.innerWidth for responsive logic — use Tailwind CSS breakpoints only
+2. All click handlers use onClick not onMouseOver/onMouseEnter
+3. All touch targets minimum 44px height
+4. Use -webkit-overflow-scrolling: touch on scrollable lists
+5. Don't use window.confirm() — use shadcn AlertDialog instead
+6. Add safe area CSS to index.css:
+```css
+.safe-top { padding-top: env(safe-area-inset-top); }
+.safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
+```
+7. Apply safe-top to topbar, safe-bottom to bottom nav
+
+================================================================================
+IMPLEMENTATION ORDER
+================================================================================
+
+Do these in this exact order:
+
+1. Create src/lib/theme.ts (design tokens)
+2. Create src/lib/utils.ts (toDate helper + other utils)
+3. Create src/lib/googleCalendar.ts (full Google Calendar integration)
+4. Update src/components/ui/StatusBadge.tsx
+5. Update src/components/ui/CategoryTag.tsx
+6. Update src/components/EventCard.tsx
+7. Update src/components/MiniCalendar.tsx
+8. Update src/components/Layout.tsx (responsive sidebar + bottom nav)
+9. Update src/pages/Dashboard.tsx
+10. Update src/pages/EventsList.tsx
+11. Update src/pages/EventDetail.tsx
+12. Update src/pages/EventCreate.tsx
+13. Update src/pages/EventEdit.tsx
+14. Update src/pages/Calendar.tsx
+15. Update src/pages/Profile.tsx
+16. Update src/pages/Users.tsx
+17. Update src/pages/Reports.tsx
+18. Add src/pages/GoogleCalendarCallback.tsx
+19. Add /auth/google/callback route to App.tsx
+20. Fix date handling in EventCreate.tsx and EventEdit.tsx
+21. Fix useEvents.ts to use toDate() helper
+
+Confirm each file when done before moving to the next.
+Do NOT rewrite working Firebase/Supabase logic — only update UI and add Google Calendar.
+
+================================================================================
+END OF PROMPT
+================================================================================

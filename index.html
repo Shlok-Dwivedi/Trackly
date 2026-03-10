@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Trackly</title>
+    <meta name="description" content="Trackly — Event management for NGOs" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', function () {
+    (function () {
+      // ── Shared canvas ──────────────────────────────────────────────
+      var canvas = document.createElement('canvas');
+      canvas.style.cssText = 'position:fixed;top:0;left:0;pointer-events:none;z-index:99999;';
+      canvas.setAttribute('aria-hidden', 'true');
+      document.body.appendChild(canvas);
+      var ctx = canvas.getContext('2d');
+
+      function resize() {
+        canvas.width  = window.innerWidth;
+        canvas.height = window.innerHeight;
+      }
+      resize();
+      window.addEventListener('resize', resize);
+
+      // ── Letter sets ────────────────────────────────────────────────
+      var LETTERS = (
+        'अ आ इ ई उ ऊ ए ऐ ओ औ क ख ग घ च छ ज झ ट ठ ड ढ त थ द ध न प फ ब भ म य र ल व श ष स ह ' +
+        'A B C D E F G H I J K L M N O P Q R S T U V W X Y Z ' +
+        'அ ஆ இ ஈ உ ஊ எ ஏ ஐ ஒ ஓ ஔ க ங ச ஞ ட ண த ந ப ம ' +
+        'అ ఆ ఇ ఈ ఉ ఊ ఎ ఏ ఐ ఒ ఓ ఔ క ఖ గ ఘ చ ఛ జ ఝ ' +
+        'অ আ ই ঈ উ ঊ এ ঐ ও ঔ ক খ গ ঘ চ ছ জ ঝ ট ঠ ' +
+        'ಅ ಆ ಇ ಈ ಉ ಊ ಎ ಏ ಐ ಒ ಓ ಔ ಕ ಖ ಗ ಘ ಚ ಛ ' +
+        'അ ആ ഇ ഈ ഉ ഊ എ ഏ ഐ ഒ ഓ ഔ ക ഖ ഗ ഘ ച ഛ ' +
+        'અ આ ઇ ઈ ઉ ઊ એ ઐ ઓ ઔ ક ખ ગ ઘ ચ છ જ ઝ'
+      ).split(' ').filter(Boolean);
+
+      var COLORS = [
+        'rgba(139,92,246,',   // purple
+        'rgba(225,29,72,',    // coral
+        'rgba(217,119,6,',    // gold
+        'rgba(5,150,105,',    // emerald
+        'rgba(37,99,235,',    // blue
+      ];
+
+      var FONT = "'Noto Sans Devanagari','Noto Sans Tamil','Noto Sans Telugu','Noto Sans Bengali',system-ui,sans-serif";
+
+      // ── State ──────────────────────────────────────────────────────
+      var particles = [];   // floating letters
+      var ripples   = [];   // water rings
+
+      var lastX = 0, lastY = 0, lastSpawn = 0;
+      var mouseX = 0, mouseY = 0;
+      var firstMove = true;
+
+      function rand(a, b) { return a + Math.random() * (b - a); }
+      function randInt(a, b) { return Math.floor(rand(a, b + 1)); }
+      function pick(arr) { return arr[randInt(0, arr.length - 1)]; }
+
+      // ── Spawn letter ───────────────────────────────────────────────
+      function spawnLetter(x, y) {
+        if (particles.length >= 20) particles.shift();
+        particles.push({
+          x: x + rand(-12, 12),
+          y: y + rand(-12, 12),
+          char: pick(LETTERS),
+          size: rand(14, 28),
+          color: pick(COLORS),
+          vx: rand(-0.6, 0.6),
+          vy: rand(-1.8, -0.8),
+          rotation: rand(-0.3, 0.3),
+          rotSpeed: rand(-0.04, 0.04),
+          alpha: 0.75,
+          life: 0,
+          maxLife: rand(2200, 3500),
+          born: performance.now(),
+        });
+      }
+
+      // ── Spawn ripple ───────────────────────────────────────────────
+      function spawnRipple(x, y) {
+        if (ripples.length >= 10) ripples.shift();
+        ripples.push({ x: x, y: y, r: 0, a: 0.55 });
+      }
+
+      // ── Mouse events ───────────────────────────────────────────────
+      document.addEventListener('mousemove', function(e) {
+        if (firstMove) {
+          lastX = e.clientX; lastY = e.clientY;
+          firstMove = false;
+          return;
+        }
+        mouseX = e.clientX; mouseY = e.clientY;
+        var dx = e.clientX - lastX, dy = e.clientY - lastY;
+        var dist = Math.sqrt(dx*dx + dy*dy);
+
+        // Letters: spawn every 200ms if moved 30px
+        var now = performance.now();
+        if (dist >= 30 && now - lastSpawn >= 200) {
+          spawnLetter(e.clientX, e.clientY);
+          lastSpawn = now;
+        }
+
+        // Ripple: spawn every 50px of movement
+        if (dist >= 50) {
+          spawnRipple(e.clientX, e.clientY);
+          lastX = e.clientX; lastY = e.clientY;
+        }
+      });
+
+      document.addEventListener('click', function(e) {
+        spawnLetter(e.clientX, e.clientY);
+        spawnLetter(e.clientX, e.clientY);
+        spawnRipple(e.clientX, e.clientY);
+        setTimeout(function(){ spawnRipple(e.clientX+8, e.clientY+8); }, 60);
+        setTimeout(function(){ spawnRipple(e.clientX-8, e.clientY-8); }, 120);
+      });
+
+      // ── Animation loop ─────────────────────────────────────────────
+      function loop(now) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Draw ripples
+        for (var i = ripples.length - 1; i >= 0; i--) {
+          var rp = ripples[i];
+          rp.r += 4;
+          rp.a -= 4 / 180;
+          if (rp.a <= 0) { ripples.splice(i, 1); continue; }
+
+          var g = ctx.createRadialGradient(rp.x, rp.y, 0, rp.x, rp.y, rp.r);
+          g.addColorStop(0,   'rgba(139,92,246,'+(rp.a*0.45).toFixed(3)+')');
+          g.addColorStop(0.5, 'rgba(139,92,246,'+(rp.a*0.2).toFixed(3)+')');
+          g.addColorStop(1,   'rgba(139,92,246,0)');
+          ctx.beginPath();
+          ctx.arc(rp.x, rp.y, rp.r, 0, Math.PI*2);
+          ctx.fillStyle = g;
+          ctx.fill();
+          ctx.beginPath();
+          ctx.arc(rp.x, rp.y, rp.r, 0, Math.PI*2);
+          ctx.strokeStyle = 'rgba(139,92,246,'+(rp.a*0.5).toFixed(3)+')';
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
+        }
+
+        // Draw letters
+        for (var j = particles.length - 1; j >= 0; j--) {
+          var p = particles[j];
+          var age = now - p.born;
+          var progress = age / p.maxLife;
+          if (progress >= 1) { particles.splice(j, 1); continue; }
+
+          // Fade in first 15%, stay, fade out last 30%
+          var alpha;
+          if (progress < 0.15) alpha = p.alpha * (progress / 0.15);
+          else if (progress > 0.7) alpha = p.alpha * (1 - (progress - 0.7) / 0.3);
+          else alpha = p.alpha;
+
+          p.x += p.vx;
+          p.y += p.vy;
+          p.vy *= 0.99; // slight drag
+          p.x += Math.sin(age * 0.003 + j) * 0.4; // wobble
+          p.rotation += p.rotSpeed;
+
+          ctx.save();
+          ctx.translate(p.x, p.y);
+          ctx.rotate(p.rotation);
+          ctx.font = 'bold ' + p.size + 'px ' + FONT;
+          ctx.fillStyle = p.color + alpha.toFixed(3) + ')';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(p.char, 0, 0);
+          ctx.restore();
+        }
+
+        requestAnimationFrame(loop);
+      }
+      requestAnimationFrame(loop);
+    })();
+    }); // DOMContentLoaded
+    </script>
+  </body>
+</html>
