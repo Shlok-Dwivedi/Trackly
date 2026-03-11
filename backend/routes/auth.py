@@ -54,7 +54,16 @@ def set_role():
     try:
         id_token = _extract_bearer_token()
         decoded = verify_id_token(id_token)
+        caller_uid = decoded.get("uid") or decoded.get("user_id")
         caller_role = decoded.get("role")
+
+        # Fallback: check Firestore if custom claim not set yet
+        if not caller_role and caller_uid:
+            db = get_firestore_client()
+            doc = db.collection("users").document(caller_uid).get()
+            if doc.exists:
+                caller_role = (doc.to_dict() or {}).get("role")
+
         if caller_role != "admin":
             return jsonify({"error": "Forbidden: admin role required"}), 403
     except Exception as exc:  # noqa: BLE001
@@ -77,4 +86,3 @@ def set_role():
                 "details": str(exc),
             }
         ), 500
-
