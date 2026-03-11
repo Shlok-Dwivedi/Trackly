@@ -289,14 +289,14 @@ export default function CalendarPage() {
                 key={v}
                 onClick={() => setView(v)}
                 className={cn(
-                  "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all",
+                  "flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all",
                   view === v
                     ? "bg-violet-600 text-white shadow-sm"
                     : "text-muted-foreground hover:text-foreground hover:bg-white/10"
                 )}
               >
-                <Icon className="h-3.5 w-3.5" />
-                {label}
+                <Icon className="h-3.5 w-3.5 shrink-0" />
+                <span className="hidden sm:inline">{label}</span>
               </button>
             ))}
           </div>
