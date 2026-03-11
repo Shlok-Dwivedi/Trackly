@@ -31,6 +31,22 @@ import { getCategoryColor } from "@/lib/constants";
 
 const FLASK_BASE = import.meta.env.VITE_FLASK_API_URL || "";
 
+async function downloadPhoto(url: string, filename?: string) {
+  try {
+    const res = await fetch(url);
+    const blob = await res.blob();
+    const ext = blob.type.split("/")[1] || "jpg";
+    const name = filename || `photo.${ext}`;
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = name;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  } catch {
+    window.open(url, "_blank");
+  }
+}
+
 function fmt(ts: number) {
   return toIST(ts).toLocaleString("en-IN", {
     weekday: "short", month: "short", day: "numeric",
@@ -487,17 +503,14 @@ export default function EventDetail() {
                       )}
                       {/* Action buttons: always visible on mobile, hover-reveal on desktop */}
                       <div className="absolute top-2 right-2 flex gap-1 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
-                        <a
-                          href={photo.url}
-                          download
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          onClick={(e) => e.stopPropagation()}
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); downloadPhoto(photo.url, `${event.title}-photo-${i + 1}.jpg`); }}
                           className="p-1.5 rounded-lg bg-black/60 text-white hover:bg-black/80 transition-colors"
                           title="Download"
                         >
                           <Download className="h-3.5 w-3.5" />
-                        </a>
+                        </button>
                         {canDeletePhoto && (
                           <button type="button"
                             onClick={(e) => { e.stopPropagation(); if (confirm("Delete this photo?")) handleDeletePhoto(photo); }}
@@ -548,16 +561,13 @@ export default function EventDetail() {
                   {lightboxPhoto.uploadedByName} · {toIST(lightboxPhoto.timestamp).toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata" })}
                 </p>
                 <div className="flex items-center gap-2">
-                  <a
-                    href={lightboxPhoto.url}
-                    download
-                    target="_blank"
-                    rel="noopener noreferrer"
+                  <button
+                    onClick={() => downloadPhoto(lightboxPhoto.url, `${event.title}-photo.jpg`)}
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-xs font-medium transition-colors"
                   >
                     <Download className="h-3.5 w-3.5" />
                     Download
-                  </a>
+                  </button>
                   {(role === "admin" || lightboxPhoto.uploadedBy === user?.uid) && (
                     <button
                       onClick={() => { handleDeletePhoto(lightboxPhoto); setLightboxPhoto(null); }}
