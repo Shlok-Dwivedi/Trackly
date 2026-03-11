@@ -20,6 +20,8 @@ export interface NotificationPrefs {
   onAssignment?: boolean;
   onStatusChange?: boolean;
   reminder24hr?: boolean;
+  reminder6hr?: boolean;
+  reminder3hr?: boolean;
 }
 
 export type EnrollmentType = 'assigned' | 'open' | 'both';
