@@ -29,7 +29,25 @@ def create_app() -> Flask:
         app,
         resources={r"/api/*": {"origins": allowed_origins}},
         supports_credentials=True,
+        allow_headers=["Content-Type", "Authorization"],
+        methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     )
+
+    # Explicitly handle OPTIONS preflight for all routes
+    @app.before_request
+    def handle_options():
+        from flask import request as req
+        if req.method == "OPTIONS":
+            from flask import Response
+            origin = req.headers.get("Origin", "")
+            if origin in allowed_origins:
+                resp = Response()
+                resp.headers["Access-Control-Allow-Origin"] = origin
+                resp.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
+                resp.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
+                resp.headers["Access-Control-Allow-Credentials"] = "true"
+                resp.status_code = 204
+                return resp
 
     # Register blueprints
     from routes.auth import auth_bp
