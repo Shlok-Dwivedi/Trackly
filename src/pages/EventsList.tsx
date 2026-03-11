@@ -1,6 +1,6 @@
 import { useEffect, useState, Component, ReactNode } from "react";
 import { Link } from "react-router-dom";
-import { collection, query, orderBy, getDocs } from "firebase/firestore";
+import { collection, query, orderBy, getDocs, writeBatch, doc, serverTimestamp } from "firebase/firestore";
 import { Search, Plus, Filter, X, Loader2 } from "lucide-react";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
@@ -47,7 +47,25 @@ export default function EventsList() {
           getDocs(query(collection(db, "events"), orderBy("startDate", "desc"))),
           new Promise<never>((_, r) => setTimeout(() => r(new Error("timeout")), 4000)),
         ]);
-        setEvents(snap.docs.map((d) => ({ id: d.id, ...d.data() } as FirestoreEvent)));
+        const now = Date.now();
+        const allEvents = snap.docs.map((d) => ({ id: d.id, ...d.data() } as FirestoreEvent));
+
+        // Auto-complete expired events in a batch
+        const toComplete = allEvents.filter(e => {
+          const endMs = typeof e.endDate === "number" ? e.endDate : 0;
+          return endMs > 0 && endMs < now &&
+            (e.status?.toLowerCase() === "planned" || e.status?.toLowerCase() === "ongoing");
+        });
+        if (toComplete.length > 0) {
+          const batch = writeBatch(db);
+          toComplete.forEach(e => {
+            batch.update(doc(db, "events", e.id), { status: "Completed", updatedAt: serverTimestamp() });
+            e.status = "Completed";
+          });
+          batch.commit().catch(() => {});
+        }
+
+        setEvents(allEvents);
       } catch {
         setError("Failed to load events. Please refresh.");
         setEvents([]);
