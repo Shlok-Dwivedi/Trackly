@@ -30,8 +30,18 @@ export default function NotificationBell() {
     );
 
     const unsub = onSnapshot(q, (snap) => {
+      const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
       setNotifications(
-        snap.docs.map((d) => ({ id: d.id, ...d.data() } as Notification))
+        snap.docs
+          .map((d) => ({ id: d.id, ...d.data() } as Notification))
+          .filter((n) => {
+            const ts = n.createdAt;
+            if (!ts) return false;
+            const ms = typeof ts === "object" && "toMillis" in ts
+              ? (ts as { toMillis: () => number }).toMillis()
+              : typeof ts === "number" ? (ts < 1e12 ? ts * 1000 : ts) : 0;
+            return ms > sevenDaysAgo;
+          })
       );
     });
 
