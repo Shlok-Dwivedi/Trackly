@@ -59,7 +59,20 @@ export default function EventDetail() {
   useEffect(() => {
     if (!id) { setLoading(false); return; }
     const unsub = onSnapshot(doc(db, "events", id), (snap) => {
-      setEvent(snap.exists() ? ({ id: snap.id, ...snap.data() } as FirestoreEvent) : null);
+      if (!snap.exists()) { setEvent(null); setLoading(false); return; }
+      const data = { id: snap.id, ...snap.data() } as FirestoreEvent;
+      // Auto-complete: if endDate has passed and status is still Planned/Ongoing, mark Completed
+      const now = Date.now();
+      const endMs = typeof data.endDate === "number" ? data.endDate : 0;
+      if (endMs > 0 && endMs < now &&
+          (data.status?.toLowerCase() === "planned" || data.status?.toLowerCase() === "ongoing")) {
+        updateDoc(doc(db, "events", id), {
+          status: "Completed",
+          updatedAt: serverTimestamp(),
+        }).catch(() => {});
+        data.status = "Completed";
+      }
+      setEvent(data);
       setLoading(false);
     }, () => { setEvent(null); setLoading(false); });
     return () => unsub();
@@ -203,9 +216,13 @@ export default function EventDetail() {
   const canUpload = role === "admin" || role === "staff" ||
     (role === "volunteer" && event?.assignedTo?.includes(user?.uid ?? ""));
   const isAttending = event && user && event.attendees?.some((a) => a.uid === user.uid);
+  const isEventPast = event ? (typeof event.endDate === "number" && event.endDate < Date.now()) : false;
   const canJoin = event && user &&
     (event.enrollmentType === "open" || event.enrollmentType === "both") &&
-    (role === "volunteer" || role === "staff") && !isAttending && !userJoinRequest;
+    (role === "volunteer" || role === "staff") && !isAttending && !userJoinRequest &&
+    !isEventPast &&
+    event.status?.toLowerCase() !== "completed" &&
+    event.status?.toLowerCase() !== "cancelled";
 
   if (loading) return (
     <Layout title="Event" showBack>
