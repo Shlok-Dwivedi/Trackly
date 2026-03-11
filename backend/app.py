@@ -1,53 +1,53 @@
 import os
 
-from flask import Flask, jsonify
+from flask import Flask, Response, jsonify, request
 from flask_cors import CORS
 from dotenv import load_dotenv
 
+# Load .env in local dev; Render injects env vars in production
+load_dotenv()
+
+FRONTEND_ORIGIN = os.getenv("FRONTEND_ORIGIN", "http://localhost:5173")
+VERCEL_ORIGIN = os.getenv("VERCEL_FRONTEND_ORIGIN", "")
+
+ALLOWED_ORIGINS = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://localhost:8080",
+    "http://127.0.0.1:8080",
+    FRONTEND_ORIGIN,
+]
+if VERCEL_ORIGIN:
+    ALLOWED_ORIGINS.append(VERCEL_ORIGIN)
+
 
 def create_app() -> Flask:
-    # Load .env in local dev; Render injects env vars in production
-    load_dotenv()
-
     app = Flask(__name__)
-
-    # CORS — allow localhost for dev + Vercel origin(s) for prod
-    frontend_origin = os.getenv("FRONTEND_ORIGIN", "http://localhost:5173")
-    vercel_origin = os.getenv("VERCEL_FRONTEND_ORIGIN", "")
-
-    allowed_origins = [
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-        "http://localhost:8080",
-        "http://127.0.0.1:8080",
-        frontend_origin,
-    ]
-    if vercel_origin:
-        allowed_origins.append(vercel_origin)
 
     CORS(
         app,
-        resources={r"/api/*": {"origins": allowed_origins}},
+        origins=ALLOWED_ORIGINS,
         supports_credentials=True,
         allow_headers=["Content-Type", "Authorization"],
         methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     )
 
-    # Explicitly handle OPTIONS preflight for all routes
+    # Explicit OPTIONS preflight handler — runs before any route
     @app.before_request
-    def handle_options():
-        from flask import request as req
-        if req.method == "OPTIONS":
-            from flask import Response
-            origin = req.headers.get("Origin", "")
-            if origin in allowed_origins:
-                resp = Response()
+    def handle_preflight():
+        if request.method == "OPTIONS":
+            origin = request.headers.get("Origin", "")
+            resp = Response()
+            if origin in ALLOWED_ORIGINS:
                 resp.headers["Access-Control-Allow-Origin"] = origin
-                resp.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
-                resp.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
-                resp.headers["Access-Control-Allow-Credentials"] = "true"
-                resp.status_code = 204
-                return resp
+            else:
+                resp.headers["Access-Control-Allow-Origin"] = ALLOWED_ORIGINS[-1]
+            resp.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
+            resp.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
+            resp.headers["Access-Control-Allow-Credentials"] = "true"
+            resp.headers["Access-Control-Max-Age"] = "3600"
+            resp.status_code = 204
+            return resp
 
     # Register blueprints
     from routes.auth import auth_bp
@@ -61,8 +61,13 @@ def create_app() -> Flask:
     app.register_blueprint(events_bp)
 
     @app.route("/health", methods=["GET"])
-    def health() -> tuple[dict, int]:
-        return jsonify({"status": "ok"}), 200
+    def health():
+        origin = request.headers.get("Origin", "")
+        resp = jsonify({"status": "ok"})
+        if origin in ALLOWED_ORIGINS:
+            resp.headers["Access-Control-Allow-Origin"] = origin
+            resp.headers["Access-Control-Allow-Credentials"] = "true"
+        return resp, 200
 
     return app
 
