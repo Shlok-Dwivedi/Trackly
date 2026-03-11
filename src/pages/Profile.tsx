@@ -69,6 +69,8 @@ const DEFAULT_PREFS: NotificationPrefs = {
   onAssignment: true,
   onStatusChange: true,
   reminder24hr: true,
+  reminder6hr: true,
+  reminder3hr: true,
 };
 
 const ROLES: UserRole[] = ["admin", "staff", "volunteer", "viewer"];
@@ -864,6 +866,8 @@ export default function Profile() {
                 { key: "onAssignment" as const, label: "When assigned to an event" },
                 { key: "onStatusChange" as const, label: "When event status changes" },
                 { key: "reminder24hr" as const, label: "Remind me 24 hours before event" },
+                { key: "reminder6hr" as const, label: "Remind me 6 hours before event" },
+                { key: "reminder3hr" as const, label: "Remind me 3 hours before event" },
               ].map(({ key, label }) => (
                 <div key={key} className="flex items-center justify-between">
                   <Label htmlFor={key} className="cursor-pointer flex-1">
