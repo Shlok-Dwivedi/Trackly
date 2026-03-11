@@ -7,7 +7,7 @@ import {
 import {
   MapPin, Calendar, Users, Edit, Loader2, ExternalLink, ImageIcon,
   Trash2, UserPlus, Clock, CheckCircle, XCircle, AlertTriangle,
-  Ban, PlayCircle, Tag,
+  Ban, PlayCircle, Tag, Download,
 } from "lucide-react";
 import { db } from "@/lib/firebase";
 import { deleteStorageFile } from "@/lib/supabase";
@@ -485,14 +485,29 @@ export default function EventDetail() {
                           {photo.uploadedByName}
                         </p>
                       )}
-                      {canDeletePhoto && (
-                        <button type="button"
-                          onClick={(e) => { e.stopPropagation(); if (confirm("Delete this photo?")) handleDeletePhoto(photo); }}
-                          disabled={deletingPhotoUrl === photo.url}
-                          className="absolute top-2 right-2 p-1.5 rounded-lg bg-red-600 text-white opacity-0 group-hover:opacity-100 transition-opacity disabled:opacity-50">
-                          {deletingPhotoUrl === photo.url ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
-                        </button>
-                      )}
+                      {/* Action buttons: always visible on mobile, hover-reveal on desktop */}
+                      <div className="absolute top-2 right-2 flex gap-1 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                        <a
+                          href={photo.url}
+                          download
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          className="p-1.5 rounded-lg bg-black/60 text-white hover:bg-black/80 transition-colors"
+                          title="Download"
+                        >
+                          <Download className="h-3.5 w-3.5" />
+                        </a>
+                        {canDeletePhoto && (
+                          <button type="button"
+                            onClick={(e) => { e.stopPropagation(); if (confirm("Delete this photo?")) handleDeletePhoto(photo); }}
+                            disabled={deletingPhotoUrl === photo.url}
+                            className="p-1.5 rounded-lg bg-red-600 text-white hover:bg-red-500 transition-colors disabled:opacity-50"
+                            title="Delete">
+                            {deletingPhotoUrl === photo.url ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                          </button>
+                        )}
+                      </div>
                     </div>
                   );
                 })}
@@ -528,10 +543,32 @@ export default function EventDetail() {
           {lightboxPhoto && (
             <>
               <img src={lightboxPhoto.url} alt="" className="w-full max-h-[80vh] object-contain" />
-              <div className="p-4 border-t border-white/08">
+              <div className="p-4 border-t border-white/08 flex items-center justify-between gap-4">
                 <p className="text-sm text-muted-foreground">
                   {lightboxPhoto.uploadedByName} · {toIST(lightboxPhoto.timestamp).toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata" })}
                 </p>
+                <div className="flex items-center gap-2">
+                  <a
+                    href={lightboxPhoto.url}
+                    download
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-xs font-medium transition-colors"
+                  >
+                    <Download className="h-3.5 w-3.5" />
+                    Download
+                  </a>
+                  {(role === "admin" || lightboxPhoto.uploadedBy === user?.uid) && (
+                    <button
+                      onClick={() => { handleDeletePhoto(lightboxPhoto); setLightboxPhoto(null); }}
+                      disabled={deletingPhotoUrl === lightboxPhoto.url}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 text-white text-xs font-medium transition-colors disabled:opacity-50"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                      Delete
+                    </button>
+                  )}
+                </div>
               </div>
             </>
           )}
