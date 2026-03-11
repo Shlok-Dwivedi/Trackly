@@ -86,3 +86,90 @@ def send_notifications():
 
     return jsonify({"results": results}), 200
 
+
+@notifications_bp.route("/remind", methods=["POST"])
+def send_event_reminders():
+    """
+    POST /api/notifications/remind
+
+    Scans upcoming events and sends Firestore notifications at:
+      - 24 hours before start
+      - 6 hours before start
+      - 3 hours before start
+
+    Call this endpoint every hour via a cron job (e.g. cron-job.org, Render Cron).
+    It is idempotent — uses a 'reminders_sent' set on each event to avoid duplicates.
+
+    No body required. Returns counts of notifications sent.
+    """
+    import time
+
+    db = get_firestore_client()
+    now_ms = int(time.time() * 1000)
+
+    # Windows: label -> (min_ms_ahead, max_ms_ahead)
+    WINDOWS = {
+        "24h": (23 * 3600 * 1000, 25 * 3600 * 1000),
+        "6h":  ( 5 * 3600 * 1000,  7 * 3600 * 1000),
+        "3h":  ( 2 * 3600 * 1000,  4 * 3600 * 1000),
+    }
+
+    LABELS = {
+        "24h": "24 hours",
+        "6h":  "6 hours",
+        "3h":  "3 hours",
+    }
+
+    sent_count = 0
+    errors = []
+
+    try:
+        # Only fetch planned/ongoing events in the future
+        events_ref = db.collection("events")
+        events = events_ref.where("status", "in", ["Planned", "planned", "Ongoing", "ongoing"]).stream()
+
+        for event_doc in events:
+            event = event_doc.to_dict() or {}
+            event_id = event_doc.id
+            start_ms = event.get("startDate")
+            if not start_ms or not isinstance(start_ms, (int, float)):
+                continue
+
+            title = event.get("title", "an event")
+            assigned_to = event.get("assignedTo") or []
+            reminders_sent = set(event.get("reminders_sent") or [])
+
+            for label, (min_ahead, max_ahead) in WINDOWS.items():
+                reminder_key = f"{label}"
+                if reminder_key in reminders_sent:
+                    continue  # already sent
+
+                time_until = start_ms - now_ms
+                if min_ahead <= time_until <= max_ahead:
+                    # Send Firestore notification to each assigned user
+                    for uid in assigned_to:
+                        try:
+                            db.collection("notifications").add({
+                                "userId": uid,
+                                "title": f"Reminder: {title}",
+                                "body": f"Your event starts in {LABELS[label]}.",
+                                "eventId": event_id,
+                                "read": False,
+                                "createdAt": int(time.time() * 1000),
+                                "type": "reminder",
+                            })
+                            sent_count += 1
+                        except Exception as e:
+                            errors.append(str(e))
+
+                    # Mark reminder as sent on the event
+                    reminders_sent.add(reminder_key)
+                    try:
+                        event_doc.reference.update({"reminders_sent": list(reminders_sent)})
+                    except Exception as e:
+                        errors.append(f"mark_sent: {e}")
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+    return jsonify({"sent": sent_count, "errors": errors}), 200
