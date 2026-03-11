@@ -82,32 +82,26 @@ function MiniSparkline({ data, color }: { data: number[]; color: string }) {
 }
 
 // ── Stat card ──────────────────────────────────────────────────────────────────
-function StatCard({ label, value, icon: Icon, gradient, delay = 0,
+function StatCard({ label, value, icon: Icon, gradient,
   sparklineData, sparklineColor }: {
   label: string; value: number; icon: React.ElementType;
-  gradient: string; delay?: number;
+  gradient: string;
   sparklineData?: number[]; sparklineColor?: string;
 }) {
   const animated = useAnimatedCounter(value);
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 30, scale: 0.95 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      transition={{ duration: 0.5, delay, ease: [0.25, 0.46, 0.45, 0.94] }}
-    >
-      <div className="glass-card !p-5 sm:!p-6 !rounded-2xl hover:-translate-y-1 transition-transform duration-200">
-        <div className="flex items-start justify-between">
-          <div className={cn("p-3 rounded-xl bg-gradient-to-br shadow-lg", gradient)}>
-            <Icon className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
-          </div>
+    <div className="glass-card !p-4 !rounded-2xl hover:-translate-y-1 transition-transform duration-200">
+      <div className="flex items-start justify-between">
+        <div className={cn("p-2.5 rounded-xl bg-gradient-to-br shadow-lg", gradient)}>
+          <Icon className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
         </div>
-        <div className="mt-4">
-          <p className="text-3xl sm:text-4xl font-bold text-foreground">{animated.toLocaleString()}</p>
-          <p className="text-sm text-muted-foreground mt-1 font-medium">{label}</p>
-        </div>
-        {sparklineData && sparklineColor && <MiniSparkline data={sparklineData} color={sparklineColor} />}
       </div>
-    </motion.div>
+      <div className="mt-3">
+        <p className="text-2xl sm:text-3xl font-bold text-foreground">{animated.toLocaleString()}</p>
+        <p className="text-xs text-muted-foreground mt-1 font-medium">{label}</p>
+      </div>
+      {sparklineData && sparklineColor && <MiniSparkline data={sparklineData} color={sparklineColor} />}
+    </div>
   );
 }
 
@@ -408,15 +402,15 @@ export default function Dashboard() {
         </div>
 
         {/* ── Stat Cards ── */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
           <StatCard label="Total Events"  value={events.length}   icon={CalendarDays}
-            gradient="from-violet-500 to-purple-600" delay={0}   sparklineColor="#8B5CF6" sparklineData={sparkTotal} />
+            gradient="from-violet-500 to-purple-600" sparklineColor="#8B5CF6" sparklineData={sparkTotal} />
           <StatCard label="Volunteers"    value={volunteers}      icon={Users}
-            gradient="from-pink-500 to-rose-500"     delay={0.1} sparklineColor="#EC4899" sparklineData={sparkVolunteers} />
+            gradient="from-pink-500 to-rose-500"     sparklineColor="#EC4899" sparklineData={sparkVolunteers} />
           <StatCard label="Completed"     value={completed}       icon={CheckCircle}
-            gradient="from-cyan-500 to-sky-500"      delay={0.2} sparklineColor="#06B6D4" sparklineData={sparkCompleted} />
+            gradient="from-cyan-500 to-sky-500"      sparklineColor="#06B6D4" sparklineData={sparkCompleted} />
           <StatCard label="Upcoming (7d)" value={upcoming.length} icon={Clock}
-            gradient="from-emerald-500 to-green-500" delay={0.3} sparklineColor="#10B981" sparklineData={sparkPlanned} />
+            gradient="from-emerald-500 to-green-500" sparklineColor="#10B981" sparklineData={sparkPlanned} />
         </div>
 
         {/* ── Analytics Overview ── */}
@@ -458,9 +452,9 @@ export default function Dashboard() {
                 { label: "Completed", value: completed, total: events.length, color: "#10B981", bg: "rgba(16,185,129,0.12)" },
                 { label: "Ongoing",   value: ongoing,   total: events.length, color: "#F59E0B", bg: "rgba(245,158,11,0.12)" },
                 { label: "Planned",   value: planned,   total: events.length, color: "#8B5CF6", bg: "rgba(139,92,246,0.12)" },
-                { label: "Upcoming (7 days)", value: upcoming.length, total: events.length, color: "#06B6D4", bg: "rgba(6,182,212,0.12)" },
+                { label: "Upcoming (7 days)", value: upcoming.length, total: Math.max(upcoming.length, planned + ongoing), color: "#06B6D4", bg: "rgba(6,182,212,0.12)" },
               ].map(row => {
-                const pct = events.length > 0 ? Math.round((row.value / events.length) * 100) : 0;
+                const pct = row.total > 0 ? Math.round((row.value / row.total) * 100) : 0;
                 return (
                   <div key={row.label}>
                     <div className="flex items-center justify-between mb-1.5">
