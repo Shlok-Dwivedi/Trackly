@@ -155,7 +155,7 @@ export default function Users() {
       const idToken = await currentUser.getIdToken(true);
 
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 20000);
+      const timeout = setTimeout(() => controller.abort(), 45000);
 
       let res: Response;
       try {
