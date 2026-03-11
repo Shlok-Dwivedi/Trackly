@@ -157,22 +157,31 @@ export function DonutChart({ data, title, className }: { data: DonutData[]; titl
     <div className={cn("glass-card p-4 sm:p-6 relative", className)}>
       <h3 className="font-semibold mb-4 text-foreground">{title}</h3>
       <div className="h-64 relative">
-        <ResponsiveContainer width="100%" height="100%">
-          <PieChart>
-            <Pie
-              {...({ activeIndex, activeShape: ActiveShape } as Record<string, unknown>)}
-              data={coloredData} cx="50%" cy="50%"
-              innerRadius={55} outerRadius={75} paddingAngle={3} dataKey="value"
-              onMouseEnter={onEnter} onClick={onClickSlice}
-              animationDuration={1200} animationEasing="ease-out" stroke="none"
-            >
-              {coloredData.map((e, i) => <Cell key={i} fill={e.color} style={{ cursor: "pointer" }} />)}
-            </Pie>
-            <Tooltip content={<DonutTooltip />} />
-            <Legend verticalAlign="bottom" height={36} iconType="circle" iconSize={8}
-              formatter={(v: string) => <span className="text-xs text-muted-foreground font-medium">{v}</span>} />
-          </PieChart>
-        </ResponsiveContainer>
+        {total === 0 ? (
+          <div className="flex flex-col items-center justify-center h-full gap-3">
+            <div className="w-20 h-20 rounded-full border-4 border-dashed border-white/10 flex items-center justify-center">
+              <span className="text-2xl font-bold text-muted-foreground/30">0</span>
+            </div>
+            <p className="text-sm text-muted-foreground">No events yet</p>
+          </div>
+        ) : (
+          <ResponsiveContainer width="100%" height="100%">
+            <PieChart>
+              <Pie
+                {...({ activeIndex, activeShape: ActiveShape } as Record<string, unknown>)}
+                data={coloredData} cx="50%" cy="50%"
+                innerRadius={55} outerRadius={75} paddingAngle={3} dataKey="value"
+                onMouseEnter={onEnter} onClick={onClickSlice}
+                animationDuration={1200} animationEasing="ease-out" stroke="none"
+              >
+                {coloredData.map((e, i) => <Cell key={i} fill={e.color} style={{ cursor: "pointer" }} />)}
+              </Pie>
+              <Tooltip content={<DonutTooltip />} />
+              <Legend verticalAlign="bottom" height={36} iconType="circle" iconSize={8}
+                formatter={(v: string) => <span className="text-xs text-muted-foreground font-medium">{v}</span>} />
+            </PieChart>
+          </ResponsiveContainer>
+        )}
         <AnimatePresence>
           {selected && (
             <motion.div
