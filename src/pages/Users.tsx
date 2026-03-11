@@ -61,6 +61,11 @@ export default function Users() {
   const [newCatColor, setNewCatColor] = useState("#8b5cf6");
   const [creatingCat, setCreatingCat] = useState(false);
 
+  // Ping backend on mount so Render wakes up before admin tries role changes
+  useEffect(() => {
+    if (FLASK_BASE) fetch(`${FLASK_BASE}/health`).catch(() => {});
+  }, []);
+
   useEffect(() => {
     async function load() {
       try {
@@ -146,12 +151,29 @@ export default function Users() {
     try {
       const currentUser = auth.currentUser;
       if (!currentUser) throw new Error("You must be logged in.");
-      const idToken = await currentUser.getIdToken();
-      const res = await fetch(`${FLASK_BASE || "http://localhost:5000"}/api/auth/set-role`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
-        body: JSON.stringify({ uid, role }),
-      });
+      // Force refresh to avoid stale token errors
+      const idToken = await currentUser.getIdToken(true);
+
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 20000);
+
+      let res: Response;
+      try {
+        res = await fetch(`${FLASK_BASE}/api/auth/set-role`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
+          body: JSON.stringify({ uid, role }),
+          signal: controller.signal,
+        });
+      } catch (fetchErr) {
+        if (fetchErr instanceof Error && fetchErr.name === "AbortError") {
+          throw new Error("Request timed out — backend may be waking up, try again in 30s.");
+        }
+        throw new Error("Could not reach backend. Check your connection.");
+      } finally {
+        clearTimeout(timeout);
+      }
+
       const json = await res.json();
       if (res.ok) {
         setUsers((prev) => prev.map((u) => (u.uid === uid ? { ...u, role } : u)));
