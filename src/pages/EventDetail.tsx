@@ -121,7 +121,7 @@ export default function EventDetail() {
   }
 
   async function handleDeletePhoto(photo: EventPhoto) {
-    if (!user || !id || !event || !(role === "admin" || photo.uploadedBy === user.uid)) return;
+    if (!user || !id || !event || role !== "admin") return;
     setDeletingPhotoUrl(photo.url);
     try {
       if (photo.storagePath) await deleteStorageFile(photo.storagePath);
@@ -488,7 +488,7 @@ export default function EventDetail() {
             {event.photos?.length > 0 && (
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 mb-4">
                 {event.photos.map((photo, i) => {
-                  const canDeletePhoto = role === "admin" || photo.uploadedBy === user?.uid;
+                  const canDeletePhoto = role === "admin";
                   return (
                     <div key={`${photo.url}-${photo.timestamp}`}
                       className="relative group aspect-square overflow-hidden rounded-xl bg-muted">
@@ -568,7 +568,7 @@ export default function EventDetail() {
                     <Download className="h-3.5 w-3.5" />
                     Download
                   </button>
-                  {(role === "admin" || lightboxPhoto.uploadedBy === user?.uid) && (
+                  {role === "admin" && (
                     <button
                       onClick={() => { handleDeletePhoto(lightboxPhoto); setLightboxPhoto(null); }}
                       disabled={deletingPhotoUrl === lightboxPhoto.url}
