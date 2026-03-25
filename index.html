@@ -53,7 +53,6 @@
 
       // ── State ──────────────────────────────────────────────────────
       var particles = [];   // floating letters
-      var ripples   = [];   // water rings
 
       var lastX = 0, lastY = 0, lastSpawn = 0;
       var mouseX = 0, mouseY = 0;
@@ -83,12 +82,6 @@
         });
       }
 
-      // ── Spawn ripple ───────────────────────────────────────────────
-      function spawnRipple(x, y) {
-        if (ripples.length >= 10) ripples.shift();
-        ripples.push({ x: x, y: y, r: 0, a: 0.55 });
-      }
-
       // ── Mouse events ───────────────────────────────────────────────
       document.addEventListener('mousemove', function(e) {
         if (firstMove) {
@@ -106,47 +99,16 @@
           spawnLetter(e.clientX, e.clientY);
           lastSpawn = now;
         }
-
-        // Ripple: spawn every 50px of movement
-        if (dist >= 50) {
-          spawnRipple(e.clientX, e.clientY);
-          lastX = e.clientX; lastY = e.clientY;
-        }
       });
 
       document.addEventListener('click', function(e) {
         spawnLetter(e.clientX, e.clientY);
         spawnLetter(e.clientX, e.clientY);
-        spawnRipple(e.clientX, e.clientY);
-        setTimeout(function(){ spawnRipple(e.clientX+8, e.clientY+8); }, 60);
-        setTimeout(function(){ spawnRipple(e.clientX-8, e.clientY-8); }, 120);
       });
 
       // ── Animation loop ─────────────────────────────────────────────
       function loop(now) {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-        // Draw ripples
-        for (var i = ripples.length - 1; i >= 0; i--) {
-          var rp = ripples[i];
-          rp.r += 4;
-          rp.a -= 4 / 180;
-          if (rp.a <= 0) { ripples.splice(i, 1); continue; }
-
-          var g = ctx.createRadialGradient(rp.x, rp.y, 0, rp.x, rp.y, rp.r);
-          g.addColorStop(0,   'rgba(139,92,246,'+(rp.a*0.45).toFixed(3)+')');
-          g.addColorStop(0.5, 'rgba(139,92,246,'+(rp.a*0.2).toFixed(3)+')');
-          g.addColorStop(1,   'rgba(139,92,246,0)');
-          ctx.beginPath();
-          ctx.arc(rp.x, rp.y, rp.r, 0, Math.PI*2);
-          ctx.fillStyle = g;
-          ctx.fill();
-          ctx.beginPath();
-          ctx.arc(rp.x, rp.y, rp.r, 0, Math.PI*2);
-          ctx.strokeStyle = 'rgba(139,92,246,'+(rp.a*0.5).toFixed(3)+')';
-          ctx.lineWidth = 1.5;
-          ctx.stroke();
-        }
 
         // Draw letters
         for (var j = particles.length - 1; j >= 0; j--) {
