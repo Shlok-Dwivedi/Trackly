@@ -25,7 +25,7 @@ React + TypeScript frontend (Vite) · Python Flask backend · Firebase/Firestore
 ### 1. Clone
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/trackly.git
+git clone https://github.com/Shlok-Dwivedi/trackly.git
 cd trackly
 ```
 
