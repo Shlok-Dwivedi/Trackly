@@ -8,28 +8,28 @@
 
 :root {
   /* Core surfaces */
-  --background: 210 25% 98%;
-  --foreground: 222 35% 12%;
+  --background: 0 0% 100%;
+  --foreground: 250 30% 10%;
   --card: 0 0% 100%;
-  --card-foreground: 222 35% 12%;
+  --card-foreground: 250 30% 10%;
   --popover: 0 0% 100%;
-  --popover-foreground: 222 35% 12%;
+  --popover-foreground: 250 30% 10%;
 
-  /* Primary — professional blue */
-  --primary: 215 85% 45%;
+  /* Primary — purple #8B5CF6 */
+  --primary: 262 83% 63%;
   --primary-foreground: 0 0% 100%;
 
   /* Secondary */
-  --secondary: 210 25% 94%;
-  --secondary-foreground: 222 30% 20%;
+  --secondary: 250 20% 94%;
+  --secondary-foreground: 250 25% 20%;
 
   /* Accent */
-  --accent: 210 25% 94%;
-  --accent-foreground: 222 30% 20%;
+  --accent: 250 20% 94%;
+  --accent-foreground: 250 25% 20%;
 
   /* Muted */
-  --muted: 210 20% 92%;
-  --muted-foreground: 215 18% 42%;
+  --muted: 250 18% 92%;
+  --muted-foreground: 250 15% 46%;
 
   /* Status colors */
   --status-planned: 217 80% 55%;
@@ -46,35 +46,35 @@
   --destructive-foreground: 0 0% 100%;
 
   /* Borders / inputs */
-  --border: 214 20% 88%;
-  --input: 214 20% 88%;
-  --ring: 215 85% 45%;
+  --border: 250 20% 88%;
+  --input: 250 20% 88%;
+  --ring: 262 83% 63%;
   --radius: 0.75rem;
 
-  /* Sidebar — navy */
-  --sidebar-background: 222 45% 16%;
-  --sidebar-foreground: 214 25% 88%;
-  --sidebar-primary: 215 85% 55%;
+  /* Sidebar — deep indigo */
+  --sidebar-background: 243 55% 20%;
+  --sidebar-foreground: 250 30% 85%;
+  --sidebar-primary: 262 83% 68%;
   --sidebar-primary-foreground: 0 0% 100%;
-  --sidebar-accent: 222 35% 22%;
-  --sidebar-accent-foreground: 214 25% 95%;
-  --sidebar-border: 222 30% 24%;
-  --sidebar-ring: 215 85% 55%;
+  --sidebar-accent: 243 45% 28%;
+  --sidebar-accent-foreground: 250 30% 95%;
+  --sidebar-border: 243 40% 28%;
+  --sidebar-ring: 262 83% 68%;
 
   /* Chart colors */
-  --chart-1: 215 85% 45%;
-  --chart-2: 199 80% 42%;
-  --chart-3: 158 60% 36%;
-  --chart-4: 35 85% 45%;
-  --chart-5: 0 70% 50%;
+  --chart-1: 262 83% 63%;
+  --chart-2: 330 80% 60%;
+  --chart-3: 190 80% 44%;
+  --chart-4: 250 70% 55%;
+  --chart-5: 142 65% 38%;
 
-  /* Trackly brand colors (sober) */
-  --edu-primary: #2563EB;      /* blue-600 */
-  --edu-primary-rgb: 37, 99, 235;
-  --edu-secondary: #0EA5E9;    /* sky-500 */
-  --edu-secondary-rgb: 14, 165, 233;
-  --edu-accent: #14B8A6;       /* teal-500 */
-  --edu-accent-rgb: 20, 184, 166;
+  /* EduTrack brand colors */
+  --edu-primary: #8B5CF6;
+  --edu-primary-rgb: 139, 92, 246;
+  --edu-secondary: #EC4899;
+  --edu-secondary-rgb: 236, 72, 153;
+  --edu-accent: #06B6D4;
+  --edu-accent-rgb: 6, 182, 212;
   --edu-success: #10B981;
   --edu-success-rgb: 16, 185, 129;
   --edu-warning: #F59E0B;
@@ -91,51 +91,51 @@
   --glass-blur-strong: 24px;
 
   /* Glow effects */
-  --glow-primary: 0 0 40px rgba(37, 99, 235, 0.10);
-  --glow-secondary: 0 0 40px rgba(14, 165, 233, 0.08);
+  --glow-primary: 0 0 40px rgba(139, 92, 246, 0.12);
+  --glow-secondary: 0 0 40px rgba(236, 72, 153, 0.10);
 
-  /* Gradient background */
-  --gradient-bg: linear-gradient(160deg, #f8fafc 0%, #f1f5f9 35%, #eef2f7 70%, #f8fafc 100%);
+  /* Pure white background */
+  --gradient-bg: #ffffff;
 
   /* Legacy support */
-  --gradient-primary: linear-gradient(135deg, #2563EB, #0EA5E9);
-  --gradient-hero: linear-gradient(135deg, #0B1220 0%, #111B2E 100%);
-  --gradient-card: linear-gradient(135deg, #f1f5f9 0%, #ffffff 100%);
-  --gradient-accent: linear-gradient(135deg, #14B8A6, #0EA5E9);
+  --gradient-primary: linear-gradient(135deg, #8B5CF6, #6D28D9);
+  --gradient-hero: linear-gradient(135deg, #1E1B4B 0%, #4C1D95 100%);
+  --gradient-card: linear-gradient(135deg, #f5f3ff 0%, #ffffff 100%);
+  --gradient-accent: linear-gradient(135deg, #EC4899, #BE185D);
   --shadow-sm: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
   --shadow-md: var(--glass-shadow);
   --shadow-lg: var(--glass-shadow-elevated);
-  --shadow-primary: 0 4px 20px rgba(37, 99, 235, 0.22);
+  --shadow-primary: 0 4px 20px rgba(139, 92, 246, 0.3);
 }
 
 .dark {
   --background: 0 0% 0%;
-  --foreground: 210 25% 92%;
+  --foreground: 250 25% 92%;
   --card: 0 0% 5%;
-  --card-foreground: 210 25% 92%;
+  --card-foreground: 250 25% 92%;
   --popover: 0 0% 5%;
-  --popover-foreground: 210 25% 92%;
-  --primary: 215 85% 60%;
+  --popover-foreground: 250 25% 92%;
+  --primary: 262 83% 68%;
   --primary-foreground: 0 0% 100%;
   --secondary: 0 0% 10%;
-  --secondary-foreground: 210 25% 88%;
+  --secondary-foreground: 250 25% 88%;
   --accent: 0 0% 10%;
-  --accent-foreground: 210 25% 88%;
+  --accent-foreground: 250 25% 88%;
   --muted: 0 0% 10%;
-  --muted-foreground: 214 18% 60%;
+  --muted-foreground: 250 15% 55%;
   --destructive: 0 72% 55%;
   --destructive-foreground: 0 0% 100%;
   --border: 0 0% 14%;
   --input: 0 0% 14%;
-  --ring: 215 85% 60%;
+  --ring: 262 83% 68%;
   --sidebar-background: 0 0% 3%;
-  --sidebar-foreground: 214 25% 82%;
-  --sidebar-primary: 215 85% 62%;
+  --sidebar-foreground: 250 25% 80%;
+  --sidebar-primary: 262 83% 72%;
   --sidebar-primary-foreground: 0 0% 100%;
   --sidebar-accent: 0 0% 12%;
-  --sidebar-accent-foreground: 214 25% 90%;
+  --sidebar-accent-foreground: 250 25% 90%;
   --sidebar-border: 0 0% 10%;
-  --sidebar-ring: 215 85% 62%;
+  --sidebar-ring: 262 83% 72%;
 
   --glass-bg: rgba(0, 0, 0, 0.75);
   --glass-bg-strong: rgba(0, 0, 0, 0.88);
@@ -348,7 +348,7 @@
 .input-glass:focus {
   background: var(--glass-bg);
   border-color: var(--edu-primary);
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.18);
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.20);
 }
 
 /* Ensure input text is always readable in dark mode */
@@ -382,13 +382,13 @@ textarea::placeholder {
   background: linear-gradient(135deg, var(--edu-primary), var(--edu-secondary));
   color: white;
   border: none;
-  box-shadow: 0 4px 20px rgba(37, 99, 235, 0.22);
+  box-shadow: 0 4px 20px rgba(139, 92, 246, 0.4);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .btn-primary-glow:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 30px rgba(37, 99, 235, 0.28);
+  box-shadow: 0 8px 30px rgba(139, 92, 246, 0.5);
 }
 
 /* ============================================
@@ -428,7 +428,7 @@ textarea::placeholder {
 
 .nav-item-active {
   @apply text-white bg-primary/20 hover:bg-primary/25;
-  border-left: 3px solid var(--edu-primary);
+  border-left: 3px solid #8B5CF6;
   padding-left: calc(0.75rem - 3px);
 }
 
@@ -478,15 +478,15 @@ textarea::placeholder {
 }
 
 .gradient-orb-primary {
-  background: radial-gradient(circle, rgba(37, 99, 235, 0.45) 0%, transparent 70%);
+  background: radial-gradient(circle, rgba(139, 92, 246, 0.6) 0%, transparent 70%);
 }
 
 .gradient-orb-secondary {
-  background: radial-gradient(circle, rgba(14, 165, 233, 0.38) 0%, transparent 70%);
+  background: radial-gradient(circle, rgba(236, 72, 153, 0.6) 0%, transparent 70%);
 }
 
 .gradient-orb-accent {
-  background: radial-gradient(circle, rgba(20, 184, 166, 0.38) 0%, transparent 70%);
+  background: radial-gradient(circle, rgba(6, 182, 212, 0.6) 0%, transparent 70%);
 }
 
 .float-animation {
