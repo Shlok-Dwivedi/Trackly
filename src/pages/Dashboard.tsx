@@ -334,8 +334,8 @@ export default function Dashboard() {
               </div>
               {(role === "admin" || role === "staff") && (
                 <Link to="/events/create"
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-white text-sm font-medium shadow-lg shadow-violet-500/25 hover:shadow-xl hover:shadow-violet-500/30 transition-all hover:scale-105"
-                  style={{ background: "linear-gradient(135deg, #8B5CF6, #EC4899)" }}>
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-white text-sm font-medium shadow-lg shadow-violet-500/40 hover:shadow-xl hover:shadow-violet-500/50 transition-all hover:scale-105"
+                  style={{ background: "#8B5CF6" }}>
                   <Plus className="h-4 w-4" />
                   New Event
                 </Link>
