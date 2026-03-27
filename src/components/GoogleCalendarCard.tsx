@@ -3,7 +3,10 @@ import {
   connectGoogleCalendar, 
   disconnectGoogleCalendar, 
   isGoogleCalendarConnected,
-  getLastSyncTime 
+  getLastSyncTime,
+  getGoogleCalendarToken,
+  createGoogleCalendarEvent,
+  updateLastSyncTime,
 } from '@/lib/googleCalendar';
 import { COLORS } from '@/lib/theme';
 
@@ -15,6 +18,7 @@ interface GoogleCalendarCardProps {
 export default function GoogleCalendarCard({ onConnect, onDisconnect }: GoogleCalendarCardProps) {
   const [connected, setConnected] = useState(false);
   const [lastSync, setLastSync] = useState<Date | null>(null);
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     setConnected(isGoogleCalendarConnected());
@@ -26,37 +30,83 @@ export default function GoogleCalendarCard({ onConnect, onDisconnect }: GoogleCa
       connectGoogleCalendar();
       onConnect?.();
     } catch (error) {
+      alert('Google Calendar is not configured yet. Please add VITE_GOOGLE_CLIENT_ID to your .env file.');
       console.error('Failed to connect Google Calendar:', error);
     }
   };
 
   const handleDisconnect = () => {
+    if (!confirm('Disconnect Google Calendar? Events will no longer sync automatically.')) return;
     disconnectGoogleCalendar();
     setConnected(false);
     setLastSync(null);
     onDisconnect?.();
   };
 
-  // Format last sync time
+  const handleExportAll = async () => {
+    const token = getGoogleCalendarToken();
+    if (!token) {
+      alert('Google Calendar is not connected.');
+      return;
+    }
+
+    setExporting(true);
+    try {
+      // Pull events from Firestore and push to Google Calendar
+      const { db } = await import('@/lib/firebase');
+      const { collection, getDocs, query, orderBy } = await import('firebase/firestore');
+      const q = query(collection(db, 'events'), orderBy('startDate', 'desc'));
+      const snapshot = await getDocs(q);
+
+      let exported = 0;
+      for (const docSnap of snapshot.docs) {
+        const e = docSnap.data();
+        if (e.status === 'Cancelled') continue;
+        try {
+          await createGoogleCalendarEvent({
+            title: e.title || 'Untitled Event',
+            description: e.description || '',
+            location: e.location || '',
+            startDate: e.startDate?.toDate ? e.startDate.toDate() : new Date(e.startDate),
+            endDate: e.endDate?.toDate ? e.endDate.toDate() : new Date(e.endDate),
+          });
+          exported++;
+        } catch {
+          // skip individual failures
+        }
+      }
+
+      updateLastSyncTime();
+      setLastSync(new Date());
+      alert(`✅ Exported ${exported} event${exported !== 1 ? 's' : ''} to Google Calendar.`);
+    } catch (error) {
+      console.error('Export failed:', error);
+      alert('Export failed. Please try again.');
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const handleSyncSettings = () => {
+    alert('Sync Settings coming soon! Currently all non-cancelled events are synced automatically.');
+  };
+
   const formatLastSync = (date: Date) => {
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
     const diffMins = Math.floor(diffMs / 60000);
-    
     if (diffMins < 1) return 'Just now';
     if (diffMins < 60) return `${diffMins} min ago`;
-    
     const diffHours = Math.floor(diffMins / 60);
     if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
-    
     return date.toLocaleDateString('en-IN');
   };
 
   return (
     <div 
-      className="rounded-2xl border bg-card p-4"
+      className="rounded-2xl bg-card p-4"
       style={{
-        border: connected ? `1.5px solid ${COLORS.green}` : `1.5px solid ${COLORS.border}`,
+        border: 'none',
       }}
     >
       <div className="flex items-center justify-between gap-4">
@@ -119,16 +169,19 @@ export default function GoogleCalendarCard({ onConnect, onDisconnect }: GoogleCa
           style={{ borderTop: `1px solid ${COLORS.border}` }}
         >
           <button
-            className="px-2.5 py-1 rounded-lg text-[11px] font-bold transition-colors"
+            onClick={handleExportAll}
+            disabled={exporting}
+            className="px-2.5 py-1 rounded-lg text-[11px] font-bold transition-colors disabled:opacity-50"
             style={{
               backgroundColor: 'transparent',
               color: COLORS.teal,
               border: `1.5px solid ${COLORS.teal}`,
             }}
           >
-            ↗ Export All Events
+            {exporting ? '⏳ Exporting...' : '↗ Export All Events'}
           </button>
           <button
+            onClick={handleSyncSettings}
             className="px-2.5 py-1 rounded-lg text-[11px] font-medium transition-colors"
             style={{
               backgroundColor: COLORS.greyLight,
@@ -153,4 +206,3 @@ export default function GoogleCalendarCard({ onConnect, onDisconnect }: GoogleCa
     </div>
   );
 }
-
