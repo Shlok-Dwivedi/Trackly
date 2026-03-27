@@ -103,12 +103,7 @@ export default function GoogleCalendarCard({ onConnect, onDisconnect }: GoogleCa
   };
 
   return (
-    <div 
-      className="rounded-2xl bg-card p-4"
-      style={{
-        border: 'none',
-      }}
-    >
+    <div className="rounded-2xl bg-card p-4 shadow-md">
       <div className="flex items-center justify-between gap-4">
         {/* Icon and text */}
         <div className="flex items-center gap-3">
@@ -122,7 +117,7 @@ export default function GoogleCalendarCard({ onConnect, onDisconnect }: GoogleCa
             📆
           </div>
           <div>
-            <div className="font-bold text-sm" style={{ color: COLORS.text }}>
+            <div className="font-bold text-sm text-foreground">
               Google Calendar
             </div>
             <div className="text-xs mt-0.5" style={{ color: COLORS.textMuted }}>
