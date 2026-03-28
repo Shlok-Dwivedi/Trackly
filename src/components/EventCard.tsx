@@ -57,7 +57,7 @@ export default function EventCard({ event, compact = false, className }: EventCa
         style={{
           background: firstPhoto
             ? undefined
-            : `linear-gradient(135deg, ${accentColor}30, ${accentColor}15)`,
+            : `${accentColor}20`,
         }}
       >
         {firstPhoto ? (
