@@ -115,20 +115,20 @@ export default function CalendarPage() {
     setSearchParams({ date: newDate.toISOString() });
   }, [setSearchParams]);
 
-  const eventStyleGetter = useCallback((event: CalendarEvent) => {
-    const bg = categoryColors[event.resource.category] || getCategoryColor(event.resource.category);
-    return {
-      style: {
-        backgroundColor: bg,
-        borderRadius: "6px",
-        opacity: 0.9,
-        color: getTextColor(bg),
-        border: "none",
-        fontSize: "12px",
-        padding: "2px 6px",
-      },
-    };
-  }, [categoryColors]);
+ const eventStyleGetter = useCallback((event: CalendarEvent) => {
+  const bg = categoryColors[event.resource.category] || getCategoryColor(event.resource.category);
+  return {
+    style: {
+      backgroundColor: bg,
+      borderRadius: "6px",
+      opacity: 0.9,
+      color: getTextColor(bg),
+      border: "none",
+      fontSize: "12px",
+      padding: "2px 6px",
+    },
+  };
+}, [categoryColors]);
 
   if (loading) {
     return (
@@ -197,8 +197,7 @@ export default function CalendarPage() {
         /* Agenda view — strip full-row background, keep only event pill colored */
         .rbc-agenda-view { display: flex; flex-direction: column; flex: 1 0 0; overflow: auto; }
         .rbc-agenda-view table.rbc-agenda-table { width: 100%; border-collapse: collapse; border-spacing: 0; }
-        .rbc-agenda-view table.rbc-agenda-table tbody > tr { background: transparent !important; }
-        .rbc-agenda-view table.rbc-agenda-table tbody > tr > td { padding: 5px 10px; vertical-align: top; color: hsl(var(--foreground)) !important; background: transparent !important; }
+        .rbc-agenda-view table.rbc-agenda-table tbody > tr > td { padding: 5px 10px; vertical-align: top; color: hsl(var(--foreground)); }
         .rbc-agenda-view table.rbc-agenda-table .rbc-agenda-time-cell { padding-left: 15px; padding-right: 15px; text-transform: lowercase; color: hsl(var(--muted-foreground)); }
         .rbc-agenda-view table.rbc-agenda-table tbody > tr > td + td { border-left: 1px solid rgba(255,255,255,0.06); }
         .rbc-rtl .rbc-agenda-view table.rbc-agenda-table tbody > tr > td + td { border-left-width: 0; border-right: 1px solid rgba(255,255,255,0.06); }
@@ -209,8 +208,8 @@ export default function CalendarPage() {
         .rbc-agenda-time-cell .rbc-continues-after:after { content: ' \BB'; }
         .rbc-agenda-time-cell .rbc-continues-prior:before { content: '\AB  '; }
         .rbc-agenda-date-cell, .rbc-agenda-time-cell { white-space: nowrap; }
-        .rbc-agenda-event-cell { width: 100%; background: transparent !important; }
-        .rbc-agenda-event-cell .rbc-event { display: inline-block; width: auto; }
+        .rbc-agenda-event-cell { width: 100%; }
+        .rbc-agenda-event-cell .rbc-event { display: inline-block; width: auto; border-radius: 6px; padding: 2px 8px; }
 
         .rbc-time-column { display: flex; flex-direction: column; min-height: 100%; }
         .rbc-time-column .rbc-timeslot-group { flex: 1; }
