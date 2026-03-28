@@ -441,7 +441,7 @@ export default function Dashboard() {
           <motion.div className="glass-card !rounded-2xl !p-6"
             initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.6 }}>
             <h3 className="text-lg font-semibold text-foreground mb-4">Recent Activity</h3>
-            <ActivityFeed maxItems={5} compact />
+            <ActivityFeed maxItems={5} compact filterActions={["event_created", "status_changed", "event_cancelled"]} />
           </motion.div>
 
           <motion.div className="glass-card !rounded-2xl !p-6"
