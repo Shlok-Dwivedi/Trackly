@@ -28,6 +28,7 @@ import {
 } from "@/lib/googleCalendar";
 import { toDate } from "@/lib/utils";
 import { getCategoryColor } from "@/lib/constants";
+import { writeActivityLog } from "@/lib/activityLog";
 
 const FLASK_BASE = import.meta.env.VITE_FLASK_API_URL || "";
 
@@ -77,15 +78,11 @@ export default function EventDetail() {
     const unsub = onSnapshot(doc(db, "events", id), (snap) => {
       if (!snap.exists()) { setEvent(null); setLoading(false); return; }
       const data = { id: snap.id, ...snap.data() } as FirestoreEvent;
-      // Auto-complete: if endDate has passed and status is still Planned/Ongoing, mark Completed
       const now = Date.now();
       const endMs = typeof data.endDate === "number" ? data.endDate : 0;
       if (endMs > 0 && endMs < now &&
           (data.status?.toLowerCase() === "planned" || data.status?.toLowerCase() === "ongoing")) {
-        updateDoc(doc(db, "events", id), {
-          status: "Completed",
-          updatedAt: serverTimestamp(),
-        }).catch(() => {});
+        updateDoc(doc(db, "events", id), { status: "Completed", updatedAt: serverTimestamp() }).catch(() => {});
         data.status = "Completed";
       }
       setEvent(data);
@@ -100,10 +97,7 @@ export default function EventDetail() {
       try {
         const q = query(collection(db, "events", id!, "joinRequests"), where("uid", "==", user!.uid));
         const snap = await getDocs(q);
-        if (!snap.empty) {
-          const d = snap.docs[0].data();
-          setUserJoinRequest(d as JoinRequest);
-        }
+        if (!snap.empty) setUserJoinRequest(snap.docs[0].data() as JoinRequest);
       } catch {}
     }
     checkJoinRequest();
@@ -133,9 +127,7 @@ export default function EventDetail() {
       toast.success("Photo deleted");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Failed to delete photo");
-    } finally {
-      setDeletingPhotoUrl(null);
-    }
+    } finally { setDeletingPhotoUrl(null); }
   }
 
   async function handleDeleteEvent() {
@@ -151,10 +143,7 @@ export default function EventDetail() {
       navigate("/events");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Failed to delete event");
-    } finally {
-      setDeletingEvent(false);
-      setShowDeleteModal(false);
-    }
+    } finally { setDeletingEvent(false); setShowDeleteModal(false); }
   }
 
   async function handleCancelEvent() {
@@ -193,8 +182,7 @@ export default function EventDetail() {
       }
       return;
     }
-    setExporting(true);
-    setExportMsg(null);
+    setExporting(true); setExportMsg(null);
     try {
       const result = await createGoogleCalendarEvent({
         title: event.title, description: event.description || "",
@@ -242,9 +230,7 @@ export default function EventDetail() {
 
   if (loading) return (
     <Layout title="Event" showBack>
-      <div className="flex justify-center py-24">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
+      <div className="flex justify-center py-24"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
     </Layout>
   );
 
@@ -270,30 +256,13 @@ export default function EventDetail() {
 
         {/* Hero header */}
         <div
-          className="relative h-48 md:h-64 flex items-end overflow-hidden"
-          style={{
-            background: heroPhoto ? undefined
-              : `${accentColor}18`,
-          }}
+          className="relative h-48 md:h-64 flex items-end overflow-hidden rounded-2xl"
+          style={{ background: heroPhoto ? undefined : `${accentColor}40` }}
         >
           {heroPhoto && (
             <img src={heroPhoto.url} alt={event.title} className="absolute inset-0 w-full h-full object-cover" />
           )}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
-          <div className="relative z-10 p-5 w-full">
-            <div className="flex flex-wrap gap-2 mb-2">
-              <StatusBadge status={event.status} />
-              {event.category && (
-                <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium text-white"
-                  style={{ backgroundColor: `${accentColor}90` }}>
-                  {event.category}
-                </span>
-              )}
-            </div>
-            <h1 className="text-xl md:text-2xl font-extrabold text-white leading-tight line-clamp-2">
-              {event.title}
-            </h1>
-          </div>
+          {/* No dark overlay — title/badges moved below the hero */}
           {/* Action buttons top-right */}
           <div className="absolute top-4 right-4 flex gap-2 z-10">
             {role === "admin" && (
@@ -323,6 +292,22 @@ export default function EventDetail() {
               </Link>
             )}
           </div>
+        </div>
+
+        {/* Title + badges below hero */}
+        <div className="px-1 pt-4 pb-1">
+          <div className="flex flex-wrap gap-2 mb-2">
+            <StatusBadge status={event.status} />
+            {event.category && (
+              <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium text-white"
+                style={{ backgroundColor: `${accentColor}90` }}>
+                {event.category}
+              </span>
+            )}
+          </div>
+          <h1 className="text-xl md:text-2xl font-extrabold text-foreground leading-tight line-clamp-2">
+            {event.title}
+          </h1>
         </div>
 
         {/* Content */}
@@ -397,7 +382,6 @@ export default function EventDetail() {
                 </span>
               )}
             </div>
-
             {user && (role === "volunteer" || role === "staff") && (
               <div className="pt-2 border-t border-white/08">
                 {isAttending ? (
@@ -430,9 +414,7 @@ export default function EventDetail() {
           {/* Attendees */}
           {event.attendees && event.attendees.length > 0 && (
             <div className="glass-card">
-              <h3 className="text-sm font-semibold text-foreground mb-3">
-                Attendees ({event.attendees.length})
-              </h3>
+              <h3 className="text-sm font-semibold text-foreground mb-3">Attendees ({event.attendees.length})</h3>
               <div className="flex flex-wrap gap-2">
                 {event.attendees.map((a) => (
                   <div key={a.uid} className="flex items-center gap-2 rounded-xl bg-white/05 px-3 py-1.5">
@@ -482,9 +464,7 @@ export default function EventDetail() {
 
           {/* Photos */}
           <div>
-            <h2 className="mb-3 text-sm font-semibold text-foreground">
-              Photos ({event.photos?.length ?? 0})
-            </h2>
+            <h2 className="mb-3 text-sm font-semibold text-foreground">Photos ({event.photos?.length ?? 0})</h2>
             {event.photos?.length > 0 && (
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 mb-4">
                 {event.photos.map((photo, i) => {
@@ -501,22 +481,17 @@ export default function EventDetail() {
                           {photo.uploadedByName}
                         </p>
                       )}
-                      {/* Action buttons: always visible on mobile, hover-reveal on desktop */}
                       <div className="absolute top-2 right-2 flex gap-1 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
-                        <button
-                          type="button"
+                        <button type="button"
                           onClick={(e) => { e.stopPropagation(); downloadPhoto(photo.url, `${event.title}-photo-${i + 1}.jpg`); }}
-                          className="p-1.5 rounded-lg bg-black/60 text-white hover:bg-black/80 transition-colors"
-                          title="Download"
-                        >
+                          className="p-1.5 rounded-lg bg-black/60 text-white hover:bg-black/80 transition-colors" title="Download">
                           <Download className="h-3.5 w-3.5" />
                         </button>
                         {canDeletePhoto && (
                           <button type="button"
                             onClick={(e) => { e.stopPropagation(); if (confirm("Delete this photo?")) handleDeletePhoto(photo); }}
                             disabled={deletingPhotoUrl === photo.url}
-                            className="p-1.5 rounded-lg bg-red-600 text-white hover:bg-red-500 transition-colors disabled:opacity-50"
-                            title="Delete">
+                            className="p-1.5 rounded-lg bg-red-600 text-white hover:bg-red-500 transition-colors disabled:opacity-50" title="Delete">
                             {deletingPhotoUrl === photo.url ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
                           </button>
                         )}
@@ -535,8 +510,7 @@ export default function EventDetail() {
             )}
           </div>
         </div>
-
-        </div> {/* end main column */}
+        </div>
 
         {/* Activity sidebar */}
         <div className="lg:sticky lg:top-24">
@@ -546,9 +520,8 @@ export default function EventDetail() {
           </div>
         </div>
 
-        </div> {/* end grid */}
-
-      </div> {/* end animate-fade-in */}
+        </div>
+      </div>
 
       {/* Lightbox */}
       <Dialog open={!!lightboxPhoto} onOpenChange={() => setLightboxPhoto(null)}>
@@ -561,21 +534,15 @@ export default function EventDetail() {
                   {lightboxPhoto.uploadedByName} · {toIST(lightboxPhoto.timestamp).toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata" })}
                 </p>
                 <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => downloadPhoto(lightboxPhoto.url, `${event.title}-photo.jpg`)}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-xs font-medium transition-colors"
-                  >
-                    <Download className="h-3.5 w-3.5" />
-                    Download
+                  <button onClick={() => downloadPhoto(lightboxPhoto.url, `${event.title}-photo.jpg`)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-xs font-medium transition-colors">
+                    <Download className="h-3.5 w-3.5" /> Download
                   </button>
                   {(role === "admin" || lightboxPhoto.uploadedBy === user?.uid) && (
-                    <button
-                      onClick={() => { handleDeletePhoto(lightboxPhoto); setLightboxPhoto(null); }}
+                    <button onClick={() => { handleDeletePhoto(lightboxPhoto); setLightboxPhoto(null); }}
                       disabled={deletingPhotoUrl === lightboxPhoto.url}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 text-white text-xs font-medium transition-colors disabled:opacity-50"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                      Delete
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 text-white text-xs font-medium transition-colors disabled:opacity-50">
+                      <Trash2 className="h-3.5 w-3.5" /> Delete
                     </button>
                   )}
                 </div>
