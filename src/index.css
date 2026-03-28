@@ -137,9 +137,9 @@
   --sidebar-border: 0 0% 10%;
   --sidebar-ring: 262 83% 72%;
 
-  --glass-bg: rgba(0, 0, 0, 0.75);
-  --glass-bg-strong: rgba(0, 0, 0, 0.88);
-  --glass-bg-subtle: rgba(0, 0, 0, 0.50);
+  --glass-bg: rgba(10, 10, 10, 0.98);
+  --glass-bg-strong: rgba(5, 5, 5, 1);
+  --glass-bg-subtle: rgba(15, 15, 15, 0.95);
   --glass-border: rgba(255, 255, 255, 0.06);
   --glass-shadow: 0 4px 20px -4px rgba(0, 0, 0, 0.4);
   --glass-shadow-elevated: 0 8px 30px -4px rgba(0, 0, 0, 0.5);
