@@ -273,7 +273,7 @@ export default function EventDetail() {
           className="relative h-48 md:h-64 flex items-end overflow-hidden"
           style={{
             background: heroPhoto ? undefined
-              : `linear-gradient(135deg, ${accentColor}30 0%, ${accentColor}10 50%, rgba(139,92,246,0.15) 100%)`,
+              : `${accentColor}18`,
           }}
         >
           {heroPhoto && (
