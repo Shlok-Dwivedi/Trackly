@@ -57,7 +57,7 @@ export default function EventCard({ event, compact = false, className }: EventCa
         style={{
           background: firstPhoto
             ? undefined
-            : `${accentColor}20`,
+            : `${accentColor}40`,
         }}
       >
         {firstPhoto ? (
