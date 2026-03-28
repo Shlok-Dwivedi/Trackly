@@ -34,6 +34,27 @@ function getTextColor(hex: string): string {
   return luminance > 0.5 ? "#1a1a1a" : "#ffffff";
 }
 
+const categoryColorsRef = { current: {} as Record<string, string> };
+
+function AgendaEvent({ event }: { event: CalendarEvent }) {
+  const bg = categoryColorsRef.current[event.resource?.category] || getCategoryColor(event.resource?.category || "");
+  return (
+    <span
+      style={{
+        backgroundColor: bg,
+        color: getTextColor(bg),
+        borderRadius: "6px",
+        padding: "2px 10px",
+        fontSize: "12px",
+        fontWeight: 500,
+        display: "inline-block",
+      }}
+    >
+      {event.title}
+    </span>
+  );
+}
+
 export default function CalendarPage() {
   const { user, role } = useAuth();
   const navigate = useNavigate();
@@ -75,6 +96,11 @@ export default function CalendarPage() {
     return unsub;
   }, []);
 
+  // Keep ref in sync so AgendaEvent (outside component) can read it
+  useEffect(() => {
+    categoryColorsRef.current = categoryColors;
+  }, [categoryColors]);
+
   const calendarEvents = useMemo(() => {
     return events
       .filter((e) => {
@@ -115,20 +141,20 @@ export default function CalendarPage() {
     setSearchParams({ date: newDate.toISOString() });
   }, [setSearchParams]);
 
- const eventStyleGetter = useCallback((event: CalendarEvent) => {
-  const bg = categoryColors[event.resource.category] || getCategoryColor(event.resource.category);
-  return {
-    style: {
-      backgroundColor: bg,
-      borderRadius: "6px",
-      opacity: 0.9,
-      color: getTextColor(bg),
-      border: "none",
-      fontSize: "12px",
-      padding: "2px 6px",
-    },
-  };
-}, [categoryColors]);
+  const eventStyleGetter = useCallback((event: CalendarEvent) => {
+    const bg = categoryColors[event.resource.category] || getCategoryColor(event.resource.category);
+    return {
+      style: {
+        backgroundColor: bg,
+        borderRadius: "6px",
+        opacity: 0.9,
+        color: getTextColor(bg),
+        border: "none",
+        fontSize: "12px",
+        padding: "2px 6px",
+      },
+    };
+  }, [categoryColors]);
 
   if (loading) {
     return (
@@ -194,10 +220,11 @@ export default function CalendarPage() {
         .rbc-overlay { position: absolute; z-index: 5; border: 1px solid rgba(255,255,255,0.1); background: rgba(15,12,41,0.95); backdrop-filter: blur(20px); border-radius: 12px; box-shadow: 0 8px 32px rgba(0,0,0,0.4); padding: 10px; }
         .rbc-overlay-header { border-bottom: 1px solid rgba(255,255,255,0.1); margin: -10px -10px 5px -10px; padding: 2px 10px; color: hsl(var(--foreground)); }
 
-        /* Agenda view — strip full-row background, keep only event pill colored */
+        /* Agenda view — strip full-row background color */
         .rbc-agenda-view { display: flex; flex-direction: column; flex: 1 0 0; overflow: auto; }
         .rbc-agenda-view table.rbc-agenda-table { width: 100%; border-collapse: collapse; border-spacing: 0; }
-        .rbc-agenda-view table.rbc-agenda-table tbody > tr > td { padding: 5px 10px; vertical-align: top; color: hsl(var(--foreground)); }
+        .rbc-agenda-view table.rbc-agenda-table tbody > tr { background: transparent !important; }
+        .rbc-agenda-view table.rbc-agenda-table tbody > tr > td { padding: 5px 10px; vertical-align: top; color: hsl(var(--foreground)); background: transparent !important; }
         .rbc-agenda-view table.rbc-agenda-table .rbc-agenda-time-cell { padding-left: 15px; padding-right: 15px; text-transform: lowercase; color: hsl(var(--muted-foreground)); }
         .rbc-agenda-view table.rbc-agenda-table tbody > tr > td + td { border-left: 1px solid rgba(255,255,255,0.06); }
         .rbc-rtl .rbc-agenda-view table.rbc-agenda-table tbody > tr > td + td { border-left-width: 0; border-right: 1px solid rgba(255,255,255,0.06); }
@@ -209,7 +236,6 @@ export default function CalendarPage() {
         .rbc-agenda-time-cell .rbc-continues-prior:before { content: '\AB  '; }
         .rbc-agenda-date-cell, .rbc-agenda-time-cell { white-space: nowrap; }
         .rbc-agenda-event-cell { width: 100%; }
-        .rbc-agenda-event-cell .rbc-event { display: inline-block; width: auto; border-radius: 6px; padding: 2px 8px; }
 
         .rbc-time-column { display: flex; flex-direction: column; min-height: 100%; }
         .rbc-time-column .rbc-timeslot-group { flex: 1; }
@@ -330,6 +356,9 @@ export default function CalendarPage() {
             popup
             showMultiDayTimes
             components={{
+              agenda: {
+                event: AgendaEvent,
+              },
               toolbar: () => null,
               month: {
                 dateHeader: ({ date }: { date: Date }) => {
