@@ -23,7 +23,7 @@ interface FormState {
 }
 
 const inputClass =
-  "w-full rounded-xl border border-white/10 bg-white/05 px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-violet-500/40 focus:border-violet-500/40 transition-all";
+  "w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-violet-500/40 focus:border-violet-500/40 transition-all";
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
