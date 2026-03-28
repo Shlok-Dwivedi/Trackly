@@ -15,6 +15,24 @@ const CATEGORIES = [
   "Fundraiser","Meeting","Field Trip","Cultural","Sports","Other",
 ];
 
+/** Compute the correct status from dates, ignoring whatever is stored in Firestore */
+function computeStatus(event: FirestoreEvent): EventStatus {
+  if (event.status === "Cancelled") return "Cancelled";
+  const now = Date.now();
+  const toMs = (v: unknown): number => {
+    if (!v) return 0;
+    if (typeof v === "object" && "seconds" in (v as object))
+      return (v as { seconds: number }).seconds * 1000;
+    return typeof v === "number" ? v : new Date(v as string).getTime();
+  };
+  const start = toMs(event.startDate);
+  const end = toMs(event.endDate);
+  if (!start || !end) return event.status as EventStatus ?? "Planned";
+  if (now < start) return "Planned";
+  if (now >= start && now <= end) return "Ongoing";
+  return "Completed";
+}
+
 class EventsErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
   state = { hasError: false };
   static getDerivedStateFromError() { return { hasError: true }; }
@@ -47,25 +65,27 @@ export default function EventsList() {
           getDocs(query(collection(db, "events"), orderBy("startDate", "desc"))),
           new Promise<never>((_, r) => setTimeout(() => r(new Error("timeout")), 4000)),
         ]);
-        const now = Date.now();
+
         const allEvents = snap.docs.map((d) => ({ id: d.id, ...d.data() } as FirestoreEvent));
 
-        // Auto-complete expired events in a batch
-        const toComplete = allEvents.filter(e => {
-          const endMs = typeof e.endDate === "number" ? e.endDate : 0;
-          return endMs > 0 && endMs < now &&
-            (e.status?.toLowerCase() === "planned" || e.status?.toLowerCase() === "ongoing");
-        });
-        if (toComplete.length > 0) {
+        // Apply computed status to every event in memory
+        const now = Date.now();
+        const eventsWithStatus = allEvents.map(e => ({
+          ...e,
+          status: computeStatus(e),
+        }));
+
+        // Batch-write any status that differs from what Firestore has
+        const toUpdate = eventsWithStatus.filter((e, i) => e.status !== allEvents[i].status);
+        if (toUpdate.length > 0) {
           const batch = writeBatch(db);
-          toComplete.forEach(e => {
-            batch.update(doc(db, "events", e.id), { status: "Completed", updatedAt: serverTimestamp() });
-            e.status = "Completed";
+          toUpdate.forEach(e => {
+            batch.update(doc(db, "events", e.id), { status: e.status, updatedAt: serverTimestamp() });
           });
           batch.commit().catch(() => {});
         }
 
-        setEvents(allEvents);
+        setEvents(eventsWithStatus);
       } catch {
         setError("Failed to load events. Please refresh.");
         setEvents([]);
@@ -137,7 +157,7 @@ export default function EventsList() {
             </button>
           </div>
 
-          {/* Status tabs — always visible, like EduTrack */}
+          {/* Status tabs */}
           <div className="flex items-center gap-2 flex-wrap">
             {STATUS_TABS.map((s) => (
               <button
