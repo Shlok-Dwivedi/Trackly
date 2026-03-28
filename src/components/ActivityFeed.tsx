@@ -33,6 +33,8 @@ interface ActivityFeedProps {
   /** Show compact single-line style (for sidebar) */
   compact?: boolean;
   className?: string;
+  /** If provided, only shows these action types */
+  filterActions?: ActivityAction[];
 }
 
 // ── Config per action type ────────────────────────────────────────────────────
@@ -112,9 +114,13 @@ export default function ActivityFeed({
   maxItems = 8,
   compact = false,
   className,
+  filterActions,
 }: ActivityFeedProps) {
   const [entries, setEntries] = useState<ActivityEntry[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Fetch more than maxItems when filtering so we still fill the list after filtering
+  const fetchLimit = filterActions ? maxItems * 4 : maxItems;
 
   useEffect(() => {
     let q: Query;
@@ -124,23 +130,27 @@ export default function ActivityFeed({
         collection(db, "activityLog"),
         where("targetId", "==", eventId),
         orderBy("createdAt", "desc"),
-        limit(maxItems)
+        limit(fetchLimit)
       );
     } else {
       q = query(
         collection(db, "activityLog"),
         orderBy("createdAt", "desc"),
-        limit(maxItems)
+        limit(fetchLimit)
       );
     }
 
     const unsub = onSnapshot(q, (snap) => {
-      setEntries(snap.docs.map((d) => ({ id: d.id, ...d.data() } as ActivityEntry)));
+      let all = snap.docs.map((d) => ({ id: d.id, ...d.data() } as ActivityEntry));
+      if (filterActions) {
+        all = all.filter((e) => filterActions.includes(e.action));
+      }
+      setEntries(all.slice(0, maxItems));
       setLoading(false);
     }, () => setLoading(false));
 
     return () => unsub();
-  }, [eventId, maxItems]);
+  }, [eventId, maxItems, fetchLimit, filterActions?.join(",")]);
 
   if (loading) {
     return (

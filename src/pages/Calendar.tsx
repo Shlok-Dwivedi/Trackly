@@ -26,13 +26,42 @@ interface CalendarEvent {
 
 type CalendarView = "month" | "week" | "agenda";
 
+function getTextColor(hex: string): string {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  const luminance = (r * 0.299 + g * 0.587 + b * 0.114) / 255;
+  return luminance > 0.5 ? "#1a1a1a" : "#ffffff";
+}
+
+const categoryColorsRef = { current: {} as Record<string, string> };
+
+function AgendaEvent({ event }: { event: CalendarEvent }) {
+  const bg = categoryColorsRef.current[event.resource?.category] || getCategoryColor(event.resource?.category || "");
+  return (
+    <span
+      style={{
+        backgroundColor: bg,
+        color: getTextColor(bg),
+        borderRadius: "6px",
+        padding: "2px 10px",
+        fontSize: "12px",
+        fontWeight: 500,
+        display: "inline-block",
+      }}
+    >
+      {event.title}
+    </span>
+  );
+}
+
 export default function CalendarPage() {
   const { user, role } = useAuth();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [events, setEvents] = useState<FirestoreEvent[]>([]);
   const [loading, setLoading] = useState(true);
-  const [view, setView] = useState<CalendarView>("month"); // Always default month — never force agenda
+  const [view, setView] = useState<CalendarView>("month");
   const [myEventsOnly, setMyEventsOnly] = useState(false);
   const [date, setDate] = useState<Date>(new Date());
   const [categoryColors, setCategoryColors] = useState<Record<string, string>>({});
@@ -66,6 +95,11 @@ export default function CalendarPage() {
     );
     return unsub;
   }, []);
+
+  // Keep ref in sync so AgendaEvent (outside component) can read it
+  useEffect(() => {
+    categoryColorsRef.current = categoryColors;
+  }, [categoryColors]);
 
   const calendarEvents = useMemo(() => {
     return events
@@ -107,17 +141,20 @@ export default function CalendarPage() {
     setSearchParams({ date: newDate.toISOString() });
   }, [setSearchParams]);
 
-  const eventStyleGetter = useCallback((event: CalendarEvent) => ({
-    style: {
-      backgroundColor: categoryColors[event.resource.category] || getCategoryColor(event.resource.category),
-      borderRadius: "6px",
-      opacity: 0.9,
-      color: "white",
-      border: "none",
-      fontSize: "12px",
-      padding: "2px 6px",
-    },
-  }), [categoryColors]);
+  const eventStyleGetter = useCallback((event: CalendarEvent) => {
+    const bg = categoryColors[event.resource.category] || getCategoryColor(event.resource.category);
+    return {
+      style: {
+        backgroundColor: bg,
+        borderRadius: "6px",
+        opacity: 0.9,
+        color: getTextColor(bg),
+        border: "none",
+        fontSize: "12px",
+        padding: "2px 6px",
+      },
+    };
+  }, [categoryColors]);
 
   if (loading) {
     return (
@@ -131,7 +168,6 @@ export default function CalendarPage() {
 
   return (
     <Layout title="Calendar">
-      {/* Self-contained rbc styles — no external CSS import needed */}
       <style>{`
         .rbc-calendar { box-sizing: border-box; height: 100%; display: flex; flex-direction: column; align-items: stretch; background: transparent; color: hsl(var(--foreground)); }
         .rbc-calendar *, .rbc-calendar *:before, .rbc-calendar *:after { box-sizing: inherit; }
@@ -183,9 +219,12 @@ export default function CalendarPage() {
         .rbc-rtl .rbc-day-bg + .rbc-day-bg { border-left-width: 0; border-right: 1px solid rgba(255,255,255,0.04); }
         .rbc-overlay { position: absolute; z-index: 5; border: 1px solid rgba(255,255,255,0.1); background: rgba(15,12,41,0.95); backdrop-filter: blur(20px); border-radius: 12px; box-shadow: 0 8px 32px rgba(0,0,0,0.4); padding: 10px; }
         .rbc-overlay-header { border-bottom: 1px solid rgba(255,255,255,0.1); margin: -10px -10px 5px -10px; padding: 2px 10px; color: hsl(var(--foreground)); }
+
+        /* Agenda view — strip full-row background color */
         .rbc-agenda-view { display: flex; flex-direction: column; flex: 1 0 0; overflow: auto; }
         .rbc-agenda-view table.rbc-agenda-table { width: 100%; border-collapse: collapse; border-spacing: 0; }
-        .rbc-agenda-view table.rbc-agenda-table tbody > tr > td { padding: 5px 10px; vertical-align: top; color: hsl(var(--foreground)); }
+        .rbc-agenda-view table.rbc-agenda-table tbody > tr { background: transparent !important; }
+        .rbc-agenda-view table.rbc-agenda-table tbody > tr > td { padding: 5px 10px; vertical-align: top; color: hsl(var(--foreground)); background: transparent !important; }
         .rbc-agenda-view table.rbc-agenda-table .rbc-agenda-time-cell { padding-left: 15px; padding-right: 15px; text-transform: lowercase; color: hsl(var(--muted-foreground)); }
         .rbc-agenda-view table.rbc-agenda-table tbody > tr > td + td { border-left: 1px solid rgba(255,255,255,0.06); }
         .rbc-rtl .rbc-agenda-view table.rbc-agenda-table tbody > tr > td + td { border-left-width: 0; border-right: 1px solid rgba(255,255,255,0.06); }
@@ -197,6 +236,7 @@ export default function CalendarPage() {
         .rbc-agenda-time-cell .rbc-continues-prior:before { content: '\AB  '; }
         .rbc-agenda-date-cell, .rbc-agenda-time-cell { white-space: nowrap; }
         .rbc-agenda-event-cell { width: 100%; }
+
         .rbc-time-column { display: flex; flex-direction: column; min-height: 100%; }
         .rbc-time-column .rbc-timeslot-group { flex: 1; }
         .rbc-timeslot-group { border-bottom: 1px solid rgba(255,255,255,0.04); min-height: 40px; display: flex; flex-flow: column nowrap; }
@@ -239,13 +279,11 @@ export default function CalendarPage() {
 
       <div className="p-4 md:p-6 space-y-4 animate-fade-in">
 
-        {/* Page title */}
         <div>
           <h1 className="text-2xl font-bold text-foreground">Calendar</h1>
           <p className="text-sm text-muted-foreground mt-0.5">View and manage your schedule</p>
         </div>
 
-        {/* Status legend */}
         <div className="flex items-center gap-5">
           {([
             { label: "Completed", color: "#10B981" },
@@ -259,9 +297,7 @@ export default function CalendarPage() {
           ))}
         </div>
 
-        {/* My Events toggle + view buttons */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          {/* Pill toggle */}
           <button
             onClick={() => setMyEventsOnly(!myEventsOnly)}
             className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors w-fit"
@@ -278,7 +314,6 @@ export default function CalendarPage() {
             My Events
           </button>
 
-          {/* View toggle */}
           <div className="flex items-center gap-1 glass rounded-xl p-1">
             {([
               { v: "month",  label: "Month",  Icon: Grid3X3 },
@@ -302,7 +337,6 @@ export default function CalendarPage() {
           </div>
         </div>
 
-        {/* Calendar — CSS scoped to .rbc-wrap to prevent global bleed */}
         <div className="glass-card rbc-wrap !rounded-2xl !p-4" style={{ minHeight: "calc(100vh - 200px)" }}>
           <BigCalendar
             localizer={localizer}
@@ -322,6 +356,9 @@ export default function CalendarPage() {
             popup
             showMultiDayTimes
             components={{
+              agenda: {
+                event: AgendaEvent,
+              },
               toolbar: () => null,
               month: {
                 dateHeader: ({ date }: { date: Date }) => {
@@ -345,7 +382,6 @@ export default function CalendarPage() {
           />
         </div>
 
-        {/* Legend */}
         <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
           <span className="font-medium text-foreground">Category:</span>
           {Object.entries(categoryColors).length > 0

@@ -8,7 +8,7 @@
 
 :root {
   /* Core surfaces */
-  --background: 250 30% 98%;
+  --background: 0 0% 100%;
   --foreground: 250 30% 10%;
   --card: 0 0% 100%;
   --card-foreground: 250 30% 10%;
@@ -94,8 +94,8 @@
   --glow-primary: 0 0 40px rgba(139, 92, 246, 0.12);
   --glow-secondary: 0 0 40px rgba(236, 72, 153, 0.10);
 
-  /* Gradient background */
-  --gradient-bg: linear-gradient(160deg, #f8f7fc 0%, #f2f0fa 30%, #ecedf5 55%, #f0f1f8 80%, #f7f7fc 100%);
+  /* Pure white background */
+  --gradient-bg: #ffffff;
 
   /* Legacy support */
   --gradient-primary: linear-gradient(135deg, #8B5CF6, #6D28D9);
@@ -109,41 +109,41 @@
 }
 
 .dark {
-  --background: 250 35% 7%;
+  --background: 0 0% 0%;
   --foreground: 250 25% 92%;
-  --card: 250 30% 10%;
+  --card: 0 0% 5%;
   --card-foreground: 250 25% 92%;
-  --popover: 250 30% 10%;
+  --popover: 0 0% 5%;
   --popover-foreground: 250 25% 92%;
   --primary: 262 83% 68%;
   --primary-foreground: 0 0% 100%;
-  --secondary: 250 25% 16%;
+  --secondary: 0 0% 10%;
   --secondary-foreground: 250 25% 88%;
-  --accent: 250 25% 16%;
+  --accent: 0 0% 10%;
   --accent-foreground: 250 25% 88%;
-  --muted: 250 25% 16%;
+  --muted: 0 0% 10%;
   --muted-foreground: 250 15% 55%;
   --destructive: 0 72% 55%;
   --destructive-foreground: 0 0% 100%;
-  --border: 250 25% 20%;
-  --input: 250 25% 20%;
+  --border: 0 0% 14%;
+  --input: 0 0% 14%;
   --ring: 262 83% 68%;
-  --sidebar-background: 243 60% 12%;
+  --sidebar-background: 0 0% 3%;
   --sidebar-foreground: 250 25% 80%;
   --sidebar-primary: 262 83% 72%;
   --sidebar-primary-foreground: 0 0% 100%;
-  --sidebar-accent: 243 50% 20%;
+  --sidebar-accent: 0 0% 12%;
   --sidebar-accent-foreground: 250 25% 90%;
-  --sidebar-border: 243 45% 20%;
+  --sidebar-border: 0 0% 10%;
   --sidebar-ring: 262 83% 72%;
 
-  --glass-bg: rgba(12, 10, 30, 0.75);
-  --glass-bg-strong: rgba(12, 10, 30, 0.88);
-  --glass-bg-subtle: rgba(12, 10, 30, 0.50);
+  --glass-bg: rgba(0, 0, 0, 0.75);
+  --glass-bg-strong: rgba(0, 0, 0, 0.88);
+  --glass-bg-subtle: rgba(0, 0, 0, 0.50);
   --glass-border: rgba(255, 255, 255, 0.06);
   --glass-shadow: 0 4px 20px -4px rgba(0, 0, 0, 0.4);
   --glass-shadow-elevated: 0 8px 30px -4px rgba(0, 0, 0, 0.5);
-  --gradient-bg: linear-gradient(135deg, #06040e 0%, #0a0816 25%, #0d0b1e 50%, #0a0816 75%, #06040e 100%);
+  --gradient-bg: #000000;
 }
 
 /* ============================================
@@ -551,4 +551,3 @@ textarea::placeholder {
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: hsl(var(--border)); border-radius: 10px; }
 ::-webkit-scrollbar-thumb:hover { background: hsl(var(--muted-foreground) / 0.5); }
-

@@ -1,10 +1,8 @@
-
-
 import { motion } from 'framer-motion';
 
 export function GradientMesh() {
   return (
-    <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden" aria-hidden="true">
+    <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden hidden dark:block" aria-hidden="true">
       {/* Bottom-left warm glow */}
       <motion.div
         className="absolute w-[600px] h-[600px] rounded-full opacity-[0.15] dark:opacity-[0.10]"

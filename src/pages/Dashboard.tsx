@@ -334,8 +334,8 @@ export default function Dashboard() {
               </div>
               {(role === "admin" || role === "staff") && (
                 <Link to="/events/create"
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-white text-sm font-medium shadow-lg shadow-violet-500/25 hover:shadow-xl hover:shadow-violet-500/30 transition-all hover:scale-105"
-                  style={{ background: "linear-gradient(135deg, #8B5CF6, #EC4899)" }}>
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-white text-sm font-medium shadow-lg shadow-violet-500/40 hover:shadow-xl hover:shadow-violet-500/50 transition-all hover:scale-105"
+                  style={{ background: "#8B5CF6" }}>
                   <Plus className="h-4 w-4" />
                   New Event
                 </Link>
@@ -343,7 +343,7 @@ export default function Dashboard() {
             </div>
 
             <h1 className="text-3xl lg:text-4xl font-bold">
-              <span className="bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
+              <span className="text-purple-500">
                 {greeting}
               </span>
               {", "}
@@ -441,7 +441,7 @@ export default function Dashboard() {
           <motion.div className="glass-card !rounded-2xl !p-6"
             initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.6 }}>
             <h3 className="text-lg font-semibold text-foreground mb-4">Recent Activity</h3>
-            <ActivityFeed maxItems={5} compact />
+            <ActivityFeed maxItems={5} compact filterActions={["event_created", "event_updated", "event_cancelled", "event_reactivated", "status_changed", "user_role_changed"]}/>
           </motion.div>
 
           <motion.div className="glass-card !rounded-2xl !p-6"
