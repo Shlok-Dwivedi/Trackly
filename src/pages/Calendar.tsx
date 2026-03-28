@@ -107,17 +107,33 @@ export default function CalendarPage() {
     setSearchParams({ date: newDate.toISOString() });
   }, [setSearchParams]);
 
-  const eventStyleGetter = useCallback((event: CalendarEvent) => ({
+  function invertToMonotone(hex: string): string {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  // Invert
+  const ri = 255 - r, gi = 255 - g, bi = 255 - b;
+  // Desaturate (monotone) — weighted luminance
+  const mono = Math.round(ri * 0.299 + gi * 0.587 + bi * 0.114);
+  return `rgb(${mono}, ${mono}, ${mono})`;
+}
+
+// Then update eventStyleGetter:
+const eventStyleGetter = useCallback((event: CalendarEvent) => {
+  const bg = categoryColors[event.resource.category] || getCategoryColor(event.resource.category);
+  const textColor = invertToMonotone(bg);
+  return {
     style: {
-      backgroundColor: categoryColors[event.resource.category] || getCategoryColor(event.resource.category),
+      backgroundColor: bg,
       borderRadius: "6px",
       opacity: 0.9,
-      color: "white",
+      color: textColor,
       border: "none",
       fontSize: "12px",
       padding: "2px 6px",
     },
-  }), [categoryColors]);
+  };
+}, [categoryColors]);
 
   if (loading) {
     return (
