@@ -257,7 +257,7 @@ export default function EventDetail() {
         {/* Hero header */}
         <div
           className="relative h-48 md:h-64 flex items-end overflow-hidden rounded-2xl"
-          style={{ background: heroPhoto ? undefined : `${accentColor}40` }}
+          style={{ background: heroPhoto ? undefined : `${accentColor}25` }}
         >
           {heroPhoto && (
             <img src={heroPhoto.url} alt={event.title} className="absolute inset-0 w-full h-full object-cover" />
