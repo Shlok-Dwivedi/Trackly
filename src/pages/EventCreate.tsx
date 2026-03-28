@@ -8,6 +8,7 @@ import { FirestoreUser, EnrollmentType, Attendee } from "@/types";
 import Layout from "@/components/layout/Layout";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { writeActivityLog } from "@/lib/activityLog";
 
 const ENROLLMENT_OPTIONS: { value: EnrollmentType; label: string }[] = [
   { value: "assigned", label: "Assigned Only" },
@@ -122,6 +123,7 @@ export default function EventCreate() {
         updatedAt: serverTimestamp(),
       });
       toast.success("Event created!");
+      await writeActivityLog("event_created", user.uid, user.displayName || "User", "event", docRef.id, form.title.trim(), {});
       navigate(`/events/${docRef.id}`);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to create event";
