@@ -127,14 +127,16 @@ export default function CalendarPage() {
     return map;
   }, [events]);
 
-  const completedByDate = useMemo(() => {
-    const set = new Set<string>();
+  // Per-day: total count and completed count
+  const dayStats = useMemo(() => {
+    const map: Record<string, { total: number; completed: number }> = {};
     events.forEach((e) => {
-      if (e.status === "Completed") {
-        set.add(format(new Date(e.startDate), "yyyy-MM-dd"));
-      }
+      const key = format(new Date(e.startDate), "yyyy-MM-dd");
+      if (!map[key]) map[key] = { total: 0, completed: 0 };
+      map[key].total++;
+      if (e.status === "Completed") map[key].completed++;
     });
-    return set;
+    return map;
   }, [events]);
 
   const handleSelectEvent = useCallback((event: CalendarEvent) => {
@@ -217,10 +219,10 @@ export default function CalendarPage() {
         .rbc-row { display: flex; flex-direction: row; }
         .rbc-row-segment { padding: 0 1px 1px 1px; }
         .rbc-selected-cell { background-color: rgba(139,92,246,0.15); }
-        .rbc-show-more { z-index: 4; font-weight: bold; font-size: 85%; height: auto; line-height: normal; color: #8B5CF6; cursor: pointer; }
+        .rbc-show-more { display: none !important; }
         .rbc-month-view { position: relative; border: 1px solid rgba(255,255,255,0.08); display: flex; flex-direction: column; flex: 1 0 0; width: 100%; user-select: none; border-radius: 12px; overflow: hidden; }
         .rbc-month-header { display: flex; flex-direction: row; }
-        .rbc-month-row { display: flex; position: relative; flex-direction: column; flex: 1 0 0; flex-basis: 0px; overflow: hidden; height: 100%; border-top: 1px solid rgba(255,255,255,0.06); }
+        .rbc-month-row { display: flex; position: relative; flex-direction: column; flex: 1 0 0; flex-basis: 0px; overflow: hidden; height: 100%; min-height: 110px; border-top: 1px solid rgba(255,255,255,0.06); }
         .rbc-month-row + .rbc-month-row { border-top: 1px solid rgba(255,255,255,0.06); }
         .rbc-date-cell { flex: 1 1 0; min-width: 0; padding: 4px 6px; text-align: right; font-size: 12px; color: hsl(var(--muted-foreground)); }
         .rbc-date-cell.rbc-now { font-weight: bold; }
@@ -366,7 +368,7 @@ export default function CalendarPage() {
             eventPropGetter={eventStyleGetter}
             style={{ height: "calc(100vh - 260px)", minHeight: 480 }}
             views={["month", "week", "agenda"]}
-            popup
+            doShowMoreDrillDown={false}
             showMultiDayTimes
             components={{
               agenda: {
@@ -376,25 +378,24 @@ export default function CalendarPage() {
               month: {
                 dateHeader: ({ date }: { date: Date }) => {
                   const key = format(date, "yyyy-MM-dd");
-                  const count = eventsByDate[key] || 0;
-                  const hasCompleted = completedByDate.has(key);
+                  const stats = dayStats[key];
+                  const allDone = stats && stats.total > 0 && stats.completed === stats.total;
+                  const remaining = stats ? stats.total - stats.completed : 0;
                   return (
                     <div className="relative w-full h-full flex items-center justify-center">
-                      {hasCompleted ? (
-                        <span className="flex items-center justify-center w-6 h-6 rounded-full bg-emerald-500 text-white text-xs font-bold">
-                          ✓
-                        </span>
+                      {allDone ? (
+                        <span className="flex items-center justify-center w-6 h-6 rounded-full bg-emerald-500 text-white text-xs font-bold">✓</span>
                       ) : (
                         <span className={`text-sm ${isToday(date) ? "text-violet-400 font-bold" : ""}`}>
                           {format(date, "d")}
                         </span>
                       )}
-                      {count > 0 && (
+                      {remaining > 0 && (
                         <span
                           className="absolute -top-1 -right-1 flex items-center justify-center rounded-full bg-violet-600 text-[9px] text-white font-bold"
                           style={{ width: "14px", height: "14px" }}
                         >
-                          {count > 9 ? "9+" : count}
+                          {remaining > 9 ? "9+" : remaining}
                         </span>
                       )}
                     </div>
