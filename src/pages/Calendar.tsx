@@ -127,6 +127,16 @@ export default function CalendarPage() {
     return map;
   }, [events]);
 
+  const completedByDate = useMemo(() => {
+    const set = new Set<string>();
+    events.forEach((e) => {
+      if (e.status === "Completed") {
+        set.add(format(new Date(e.startDate), "yyyy-MM-dd"));
+      }
+    });
+    return set;
+  }, [events]);
+
   const handleSelectEvent = useCallback((event: CalendarEvent) => {
     navigate(`/events/${event.resource.eventId}`);
   }, [navigate]);
@@ -365,16 +375,19 @@ export default function CalendarPage() {
               toolbar: () => null,
               month: {
                 dateHeader: ({ date }: { date: Date }) => {
-                  const count = eventsByDate[format(date, "yyyy-MM-dd")] || 0;
-                  const today = isToday(date);
+                  const key = format(date, "yyyy-MM-dd");
+                  const count = eventsByDate[key] || 0;
+                  const hasCompleted = completedByDate.has(key);
                   return (
                     <div className="relative w-full h-full flex items-center justify-center">
-                      {today ? (
+                      {hasCompleted ? (
                         <span className="flex items-center justify-center w-6 h-6 rounded-full bg-emerald-500 text-white text-xs font-bold">
                           ✓
                         </span>
                       ) : (
-                        <span className="text-sm">{format(date, "d")}</span>
+                        <span className={`text-sm ${isToday(date) ? "text-violet-400 font-bold" : ""}`}>
+                          {format(date, "d")}
+                        </span>
                       )}
                       {count > 0 && (
                         <span
