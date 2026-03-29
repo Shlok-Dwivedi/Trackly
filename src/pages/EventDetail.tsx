@@ -154,7 +154,9 @@ export default function EventDetail() {
         status: "Cancelled", updatedAt: serverTimestamp(),
         statusHistory: arrayUnion({ status: "Cancelled", changedBy: user.uid, changedAt: Date.now(), note: "Cancelled by admin" }),
       });
-      await writeActivityLog("event_cancelled", user.uid, user.displayName || "Admin", "event", id, event.title, {});
+      await writeActivityLog("event_cancelled", user.uid, user.displayName || "Admin", "event", id, event.title, {
+        newValue: event.startDate,
+      });
       toast.success("Event cancelled");
       setShowCancelModal(false);
     } catch (e) { toast.error(e instanceof Error ? e.message : "Failed"); }
