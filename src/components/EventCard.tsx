@@ -42,10 +42,11 @@ export default function EventCard({ event, compact = false, className }: EventCa
     <Link
       to={`/events/${event.id}`}
       className={cn(
-        "group block rounded-2xl overflow-hidden transition-all duration-300",
+        "group block rounded-2xl transition-all duration-300",
         "glass-card !p-0 hover:-translate-y-1",
         className
       )}
+      style={{ isolation: "isolate" }}
       aria-label={`View event: ${event.title}`}
     >
       {/* Image header — fixed height so it's square-ish not ultra-wide */}
