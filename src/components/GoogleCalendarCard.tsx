@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { toast } from 'sonner';
 import { 
   connectGoogleCalendar, 
   disconnectGoogleCalendar, 
@@ -88,7 +89,10 @@ export default function GoogleCalendarCard({ onConnect, onDisconnect }: GoogleCa
   };
 
   const handleSyncSettings = () => {
-    alert('Sync Settings coming soon! Currently all non-cancelled events are synced automatically.');
+    toast('Sync Settings coming soon! Currently all non-cancelled events sync automatically.', {
+      icon: '⚙️',
+      duration: 4000,
+    });
   };
 
   const formatLastSync = (date: Date) => {
