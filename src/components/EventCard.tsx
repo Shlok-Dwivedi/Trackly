@@ -17,10 +17,7 @@ interface EventCardProps {
 
 function formatDate(ts: number) {
   return toIST(ts).toLocaleDateString("en-IN", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    timeZone: "Asia/Kolkata",
+    month: "short", day: "numeric", year: "numeric", timeZone: "Asia/Kolkata",
   });
 }
 
@@ -28,9 +25,7 @@ function getDescriptionText(description?: string): string {
   if (!description) return "";
   if (!isNaN(Number(description))) return "";
   if (description.trim().length < 3) return "";
-  return description.length > 90
-    ? description.substring(0, 90).trim() + "…"
-    : description;
+  return description.length > 90 ? description.substring(0, 90).trim() + "…" : description;
 }
 
 export default function EventCard({ event, compact = false, className }: EventCardProps) {
@@ -53,53 +48,50 @@ export default function EventCard({ event, compact = false, className }: EventCa
       )}
       aria-label={`View event: ${event.title}`}
     >
-      {/* Image / Color header */}
+      {/* Image header — fixed height so it's square-ish not ultra-wide */}
       <div
-        className="relative aspect-video overflow-hidden"
-        style={{
-          background: firstPhoto ? undefined : `${accentColor}25`,
-        }}
+        className="relative h-44 w-full overflow-hidden"
+        style={{ background: firstPhoto ? undefined : `${accentColor}25` }}
       >
+        {/* Photo or placeholder */}
         {firstPhoto ? (
-          <div className="absolute inset-0 overflow-hidden">
-            <img
-              src={firstPhoto.url}
-              alt={event.title}
-              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-              style={{
-                objectPosition: event.coverPosition || "center",
-                transform: `scale(${event.coverZoom || 1})`,
-                transformOrigin: event.coverPosition || "center",
-              }}
-            />
-          </div>
+          <img
+            src={firstPhoto.url}
+            alt={event.title}
+            className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+            style={{
+              objectPosition: event.coverPosition || "center",
+              transform: `scale(${event.coverZoom || 1})`,
+              transformOrigin: event.coverPosition || "center",
+            }}
+          />
         ) : (
           <div className="absolute inset-0 flex items-center justify-center">
-            <div
-              className="flex h-12 w-12 items-center justify-center rounded-2xl"
-              style={{ backgroundColor: `${accentColor}25` }}
-            >
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl"
+              style={{ backgroundColor: `${accentColor}25` }}>
               <Calendar className="h-6 w-6" style={{ color: accentColor }} />
             </div>
           </div>
         )}
 
-        {/* Always-present bottom gradient + title overlay */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
-        <div className="absolute bottom-0 left-0 right-0 p-3">
+        {/* Gradient overlay — always on top of image */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent z-10" />
+
+        {/* Category + title at bottom — z-20 so above gradient */}
+        <div className="absolute bottom-0 left-0 right-0 p-3 z-20">
           <CategoryTag category={safeCategory} />
-          <h3 className="font-bold text-white line-clamp-1 leading-tight text-sm mt-1 drop-shadow">
+          <h3 className="font-bold text-white line-clamp-1 leading-tight text-sm mt-1.5 drop-shadow-md">
             {event.title}
           </h3>
         </div>
 
-        {/* Status badge top-right */}
-        <div className="absolute top-3 right-3">
+        {/* Status badge top-right — z-20 */}
+        <div className="absolute top-3 right-3 z-20">
           <StatusBadge status={safeStatus as EventStatus} size="sm" />
         </div>
       </div>
 
-      {/* Content */}
+      {/* Content below image */}
       <div className="p-4">
         {!compact && getDescriptionText(event.description) && (
           <p className="text-xs text-muted-foreground line-clamp-2 mb-3">
@@ -107,7 +99,7 @@ export default function EventCard({ event, compact = false, className }: EventCa
           </p>
         )}
 
-        <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground mt-2">
+        <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground mt-1">
           <span className="flex items-center gap-1">
             <Calendar className="h-3 w-3 shrink-0" />
             {safeStartDate}
