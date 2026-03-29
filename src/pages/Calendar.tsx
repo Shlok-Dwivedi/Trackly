@@ -222,7 +222,7 @@ export default function CalendarPage() {
         .rbc-show-more { display: none !important; }
         .rbc-month-view { position: relative; border: 1px solid rgba(255,255,255,0.08); display: flex; flex-direction: column; flex: 1 0 0; width: 100%; user-select: none; border-radius: 12px; overflow: hidden; }
         .rbc-month-header { display: flex; flex-direction: row; }
-        .rbc-month-row { display: flex; position: relative; flex-direction: column; flex: 1 0 0; flex-basis: 0px; overflow: hidden; height: 100%; min-height: 110px; border-top: 1px solid rgba(255,255,255,0.06); }
+        .rbc-month-row { display: flex; position: relative; flex-direction: column; flex: 1 0 0; flex-basis: 0px; overflow: hidden; height: 100%; min-height: 80px; border-top: 1px solid rgba(255,255,255,0.06); }
         .rbc-month-row + .rbc-month-row { border-top: 1px solid rgba(255,255,255,0.06); }
         .rbc-date-cell { flex: 1 1 0; min-width: 0; padding: 4px 6px; text-align: right; font-size: 12px; color: hsl(var(--muted-foreground)); }
         .rbc-date-cell.rbc-now { font-weight: bold; }
