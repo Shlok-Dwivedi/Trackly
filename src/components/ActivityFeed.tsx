@@ -67,15 +67,23 @@ function timeAgo(val: unknown): string {
   return `${Math.floor(hrs / 24)}d ago`;
 }
 
+function fmtDate(val: unknown): string {
+  if (!val) return "";
+  const ms = typeof val === "number" ? (val < 1e12 ? val * 1000 : val) : 0;
+  if (!ms) return "";
+  return new Date(ms).toLocaleDateString("en-IN", { day: "numeric", month: "short", timeZone: "Asia/Kolkata" });
+}
+
 function buildDescription(entry: ActivityEntry): string {
   const name = entry.performedByName || "Someone";
   const title = entry.targetTitle || "an item";
   const d = entry.details || {};
+  const date = fmtDate(d.newValue);
   switch (entry.action) {
-    case "event_created":    return `${name} created "${title}"`;
+    case "event_created":    return `${name} created "${title}"${date ? ` — scheduled ${date}` : ""}`;
     case "event_updated":    return `${name} updated "${title}"`;
     case "event_deleted":    return `${name} deleted "${title}"`;
-    case "event_cancelled":  return `${name} cancelled "${title}"`;
+    case "event_cancelled":  return `${name} cancelled "${title}"${date ? ` (was ${date})` : ""}`;
     case "event_reactivated":return `${name} reactivated "${title}"`;
     case "status_changed":   return `"${title}" moved to ${String(d.newValue || "")}`;
     case "photo_uploaded":   return `${name} uploaded a photo to "${title}"`;
