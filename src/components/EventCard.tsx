@@ -39,7 +39,9 @@ export default function EventCard({ event, compact = false, className }: EventCa
   const safeStartDate = event.startDate ? formatDate(event.startDate) : "Date TBD";
   const safeLocation = event.location || "";
   const accentColor = getCategoryColor(safeCategory);
-  const firstPhoto = event.photos?.[0];
+  const firstPhoto = event.coverPhotoUrl
+    ? { url: event.coverPhotoUrl }
+    : event.photos?.[0];
 
   return (
     <Link
@@ -53,25 +55,29 @@ export default function EventCard({ event, compact = false, className }: EventCa
     >
       {/* Image / Color header */}
       <div
-        className="relative h-32 flex items-center justify-center overflow-hidden"
+        className="relative aspect-video overflow-hidden"
         style={{
-          background: firstPhoto
-            ? undefined
-            : `${accentColor}25`,
+          background: firstPhoto ? undefined : `${accentColor}25`,
         }}
       >
         {firstPhoto ? (
-          <img
-            src={firstPhoto.url}
-            alt={event.title}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-          />
+          <>
+            <img
+              src={firstPhoto.url}
+              alt={event.title}
+              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+            />
+            {/* Subtle bottom fade for readability */}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent" />
+          </>
         ) : (
-          <div
-            className="flex h-12 w-12 items-center justify-center rounded-2xl"
-            style={{ backgroundColor: `${accentColor}25` }}
-          >
-            <Calendar className="h-6 w-6" style={{ color: accentColor }} />
+          <div className="flex h-full items-center justify-center">
+            <div
+              className="flex h-12 w-12 items-center justify-center rounded-2xl"
+              style={{ backgroundColor: `${accentColor}25` }}
+            >
+              <Calendar className="h-6 w-6" style={{ color: accentColor }} />
+            </div>
           </div>
         )}
         {/* Status badge overlay */}
