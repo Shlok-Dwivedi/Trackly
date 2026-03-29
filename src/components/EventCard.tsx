@@ -82,11 +82,11 @@ export default function EventCard({ event, compact = false, className }: EventCa
           </div>
         )}
 
-        {/* Bottom gradient + title overlay */}
+        {/* Always-present bottom gradient + title overlay */}
         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
         <div className="absolute bottom-0 left-0 right-0 p-3">
           <CategoryTag category={safeCategory} />
-          <h3 className="font-bold text-white line-clamp-1 leading-tight text-sm mt-1">
+          <h3 className="font-bold text-white line-clamp-1 leading-tight text-sm mt-1 drop-shadow">
             {event.title}
           </h3>
         </div>
@@ -99,6 +99,14 @@ export default function EventCard({ event, compact = false, className }: EventCa
 
       {/* Content */}
       <div className="p-4">
+        {!firstPhoto && (
+          <>
+            <CategoryTag category={safeCategory} />
+            <h3 className="font-bold text-foreground line-clamp-2 leading-tight text-sm mt-1.5 mb-1">
+              {event.title}
+            </h3>
+          </>
+        )}
         {!compact && getDescriptionText(event.description) && (
           <p className="text-xs text-muted-foreground line-clamp-2 mb-3">
             {getDescriptionText(event.description)}
