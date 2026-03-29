@@ -681,6 +681,7 @@ export default function Profile() {
         </div>
 
         {/* B) Activity Stats */}
+        <h2 className="text-lg font-semibold text-foreground">Profile Stats</h2>
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
           <div className="glass-card flex flex-col gap-1">
             <Calendar className="h-5 w-5 text-primary" />
