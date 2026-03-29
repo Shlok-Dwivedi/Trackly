@@ -61,16 +61,16 @@ export default function EventCard({ event, compact = false, className }: EventCa
         }}
       >
         {firstPhoto ? (
-          <>
-            <img
-              src={firstPhoto.url}
-              alt={event.title}
-              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-              style={{ objectPosition: event.coverPosition || "center" }}
-            />
-            {/* Subtle bottom fade for readability */}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent" />
-          </>
+          <img
+            src={firstPhoto.url}
+            alt={event.title}
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+            style={{
+                objectPosition: event.coverPosition || "center",
+                transform: `scale(${event.coverZoom || 1})`,
+                transformOrigin: event.coverPosition || "center",
+              }}
+          />
         ) : (
           <div className="flex h-full items-center justify-center">
             <div
@@ -81,7 +81,17 @@ export default function EventCard({ event, compact = false, className }: EventCa
             </div>
           </div>
         )}
-        {/* Status badge overlay */}
+
+        {/* Bottom gradient + title overlay */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
+        <div className="absolute bottom-0 left-0 right-0 p-3">
+          <CategoryTag category={safeCategory} />
+          <h3 className="font-bold text-white line-clamp-1 leading-tight text-sm mt-1">
+            {event.title}
+          </h3>
+        </div>
+
+        {/* Status badge top-right */}
         <div className="absolute top-3 right-3">
           <StatusBadge status={safeStatus as EventStatus} size="sm" />
         </div>
@@ -89,14 +99,6 @@ export default function EventCard({ event, compact = false, className }: EventCa
 
       {/* Content */}
       <div className="p-4">
-        <div className="mb-1.5">
-          <CategoryTag category={safeCategory} />
-        </div>
-
-        <h3 className="font-bold text-foreground line-clamp-2 leading-tight text-sm mb-1">
-          {event.title}
-        </h3>
-
         {!compact && getDescriptionText(event.description) && (
           <p className="text-xs text-muted-foreground line-clamp-2 mb-3">
             {getDescriptionText(event.description)}
