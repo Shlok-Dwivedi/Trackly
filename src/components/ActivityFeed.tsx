@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   collection, query, orderBy, limit,
@@ -46,7 +46,6 @@ const ACTION_CONFIG: Record<ActivityAction, { label: string; color: string; bg: 
 };
 
 const DEFAULT_CONFIG = { label: "Activity", color: "#6B7280", bg: "rgba(107,114,128,0.15)", icon: Edit };
-const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
 function toMs(val: unknown): number {
   if (!val) return 0;
@@ -92,35 +91,54 @@ function buildDescription(entry: ActivityEntry): string {
 export default function ActivityFeed({ eventId, maxItems = 8, compact = false, className, filterActions }: ActivityFeedProps) {
   const [entries, setEntries] = useState<ActivityEntry[]>([]);
   const [loading, setLoading] = useState(true);
-  const fetchLimit = filterActions ? maxItems * 5 : maxItems;
+  // Stable ref for filterActions to avoid re-subscribing on every render
+  const filterRef = useRef(filterActions);
+  filterRef.current = filterActions;
 
   useEffect(() => {
     let q: Query;
+    const fetchLimit = filterActions ? maxItems * 6 : maxItems;
+
     if (eventId) {
-      q = query(collection(db, "activityLog"), where("targetId", "==", eventId), orderBy("createdAt", "desc"), limit(fetchLimit));
+      q = query(
+        collection(db, "activityLog"),
+        where("targetId", "==", eventId),
+        orderBy("createdAt", "desc"),
+        limit(fetchLimit)
+      );
     } else {
-      q = query(collection(db, "activityLog"), orderBy("createdAt", "desc"), limit(fetchLimit));
+      q = query(
+        collection(db, "activityLog"),
+        orderBy("createdAt", "desc"),
+        limit(fetchLimit)
+      );
     }
 
     const unsub = onSnapshot(q, (snap) => {
-      const cutoff = Date.now() - ONE_WEEK_MS;
       let all = snap.docs.map((d) => ({ id: d.id, ...d.data() } as ActivityEntry));
-      if (filterActions) {
-        all = all.filter((e) => toMs(e.createdAt) > cutoff && filterActions.includes(e.action));
+
+      // Apply action filter if specified (no time cutoff — show all matching)
+      if (filterRef.current && filterRef.current.length > 0) {
+        all = all.filter((e) => filterRef.current!.includes(e.action));
       }
+
       setEntries(all.slice(0, maxItems));
       setLoading(false);
     }, () => setLoading(false));
 
     return () => unsub();
-  }, [eventId, maxItems, fetchLimit, filterActions?.join(",")]);
+  // Only re-subscribe if eventId or maxItems changes — filterActions is stable via ref
+  }, [eventId, maxItems]);
 
   if (loading) return (
     <div className={cn("space-y-3", className)}>
       {[...Array(3)].map((_, i) => (
         <div key={i} className="flex gap-3 animate-pulse">
           <div className="w-8 h-8 rounded-full bg-white/10 shrink-0" />
-          <div className="flex-1 space-y-2"><div className="h-3 bg-white/10 rounded w-3/4" /><div className="h-2 bg-white/10 rounded w-1/3" /></div>
+          <div className="flex-1 space-y-2">
+            <div className="h-3 bg-white/10 rounded w-3/4" />
+            <div className="h-2 bg-white/10 rounded w-1/3" />
+          </div>
         </div>
       ))}
     </div>
@@ -128,7 +146,7 @@ export default function ActivityFeed({ eventId, maxItems = 8, compact = false, c
 
   if (entries.length === 0) return (
     <div className={cn("text-center py-8", className)}>
-      <p className="text-sm text-muted-foreground">No activity this week.</p>
+      <p className="text-sm text-muted-foreground">No activity yet.</p>
     </div>
   );
 
@@ -142,9 +160,16 @@ export default function ActivityFeed({ eventId, maxItems = 8, compact = false, c
             const Icon = config.icon;
             const isEvent = entry.targetType === "event" && entry.targetId && entry.action !== "event_deleted";
             return (
-              <motion.div key={entry.id} initial={{ opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -12 }}
+              <motion.div
+                key={entry.id}
+                initial={{ opacity: 0, x: -12 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -12 }}
                 transition={{ duration: 0.25, delay: i * 0.04 }}
-                className={cn("flex gap-3 items-start rounded-xl transition-colors", compact ? "py-2 px-2 hover:bg-white/05" : "py-3 px-2 pl-1 hover:bg-white/03")}
+                className={cn(
+                  "flex gap-3 items-start rounded-xl transition-colors",
+                  compact ? "py-2 px-2 hover:bg-white/05" : "py-3 px-2 pl-1 hover:bg-white/03"
+                )}
               >
                 <div className="relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full" style={{ backgroundColor: config.bg }}>
                   <Icon className="h-3.5 w-3.5" style={{ color: config.color }} />
