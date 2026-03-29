@@ -680,14 +680,14 @@ export default function EventDetail() {
                   const rect = e.currentTarget.getBoundingClientRect();
                   const x = Math.round(((e.clientX - rect.left) / rect.width) * 100);
                   const y = Math.round(((e.clientY - rect.top) / rect.height) * 100);
-                  setPosition({ x: Math.max(0, Math.min(100, x)), y: Math.max(0, Math.min(100, y)) });
+                  setPosition({ x: Math.max(20, Math.min(80, x)), y: Math.max(20, Math.min(80, y)) });
                 }}
                 onTouchMove={(e) => {
                   const touch = e.touches[0];
                   const rect = e.currentTarget.getBoundingClientRect();
                   const x = Math.round(((touch.clientX - rect.left) / rect.width) * 100);
                   const y = Math.round(((touch.clientY - rect.top) / rect.height) * 100);
-                  setPosition({ x: Math.max(0, Math.min(100, x)), y: Math.max(0, Math.min(100, y)) });
+                  setPosition({ x: Math.max(20, Math.min(80, x)), y: Math.max(20, Math.min(80, y)) });
                 }}
               >
                 <img
@@ -710,6 +710,11 @@ export default function EventDetail() {
                   <div className="absolute top-1/2 left-0 right-0 h-px bg-white/60 -translate-y-1/2" />
                 </div>
                 <div className="absolute inset-0 border-2 border-dashed border-white/20 rounded-xl pointer-events-none" />
+                {/* Constrained zone indicator */}
+                <div
+                  className="absolute border border-white/30 rounded-lg pointer-events-none"
+                  style={{ left: "20%", top: "20%", right: "20%", bottom: "20%" }}
+                />
               </div>
               <p className="text-xs text-center text-muted-foreground">
                 Click and drag to set focal point · {position.x}%, {position.y}%
