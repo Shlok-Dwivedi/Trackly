@@ -63,6 +63,7 @@ export interface FirestoreEvent {
   googleCalendarEventId?: string;
   coverPhotoUrl?: string;
   coverPosition?: string;
+  coverZoom?: number;
   // Enrollment fields
   enrollmentType?: EnrollmentType;
   capacity?: number;
