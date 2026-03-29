@@ -123,7 +123,9 @@ export default function EventCreate() {
         updatedAt: serverTimestamp(),
       });
       toast.success("Event created!");
-      await writeActivityLog("event_created", user.uid, user.displayName || "User", "event", docRef.id, form.title.trim(), {});
+      await writeActivityLog("event_created", user.uid, user.displayName || "User", "event", docRef.id, form.title.trim(), {
+        newValue: new Date(form.startDate).getTime(),
+      });
       // Notify all assigned users
       for (const uid of form.assignedTo) {
         await addDoc(collection(db, "notifications"), {
