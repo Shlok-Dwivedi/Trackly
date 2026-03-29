@@ -334,9 +334,11 @@ export default function Dashboard() {
               </div>
               {(role === "admin" || role === "staff") && (
                 <Link to="/events/create"
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-white text-sm font-medium shadow-lg shadow-violet-500/40 hover:shadow-violet-500/50 transition-all hover:scale-105"
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-white text-sm font-medium shadow-lg shadow-violet-500/40 hover:shadow-violet-500/50 transition-all hover:scale-105 active:scale-95 relative overflow-hidden group"
                   style={{ background: "#8B5CF6" }}>
-                  <Plus className="h-4 w-4" />
+                  {/* Shimmer sweep */}
+                  <span className="absolute inset-0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700 bg-gradient-to-r from-transparent via-white/20 to-transparent pointer-events-none" />
+                  <Plus className="h-4 w-4 transition-transform duration-300 group-hover:rotate-90" />
                   New Event
                 </Link>
               )}
