@@ -13,6 +13,7 @@ import { db } from "@/lib/firebase";
 import { FirestoreEvent, EventStatus } from "@/types";
 import { nowInIST } from "@/lib/utils";
 import { writeActivityLog } from "@/lib/activityLog";
+import { collection, addDoc } from "firebase/firestore";
 
 /**
  * Auto-update event status based on event dates.
@@ -60,6 +61,23 @@ async function autoUpdateEventStatus(event: FirestoreEvent): Promise<void> {
         previousValue: event.status,
         newValue: suggestedStatus,
       });
+      // Notify assigned users when event goes Ongoing or Completed
+      if (suggestedStatus === "Ongoing" || suggestedStatus === "Completed") {
+        const assignedTo: string[] = (event as { assignedTo?: string[] }).assignedTo || [];
+        const msg = suggestedStatus === "Ongoing"
+          ? `"${event.title}" has started!`
+          : `"${event.title}" has been marked as completed.`;
+        for (const uid of assignedTo) {
+          addDoc(collection(db, "notifications"), {
+            userId: uid,
+            title: suggestedStatus === "Ongoing" ? "Event started" : "Event completed",
+            body: msg,
+            eventId: event.id,
+            read: false,
+            createdAt: Timestamp.now(),
+          }).catch(() => {});
+        }
+      }
     } catch (err) {
       console.error("Failed to auto-update event status:", err);
     }
