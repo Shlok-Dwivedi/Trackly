@@ -74,6 +74,7 @@ export default function EventDetail() {
   const [cancelling, setCancelling] = useState(false);
   const [repositionPhoto, setRepositionPhoto] = useState<EventPhoto | null>(null);
   const [position, setPosition] = useState({ x: 50, y: 50 });
+  const [zoom, setZoom] = useState(1);
 
   useEffect(() => {
     if (!id) { setLoading(false); return; }
@@ -207,9 +208,10 @@ export default function EventDetail() {
   async function handleSetCover(photo: EventPhoto) {
     if (!id || !event) return;
     try {
-      await updateDoc(doc(db, "events", id), { coverPhotoUrl: photo.url, coverPosition: "50% 50%", updatedAt: serverTimestamp() });
-      setEvent((prev) => prev ? { ...prev, coverPhotoUrl: photo.url, coverPosition: "50% 50%" } : prev);
+      await updateDoc(doc(db, "events", id), { coverPhotoUrl: photo.url, coverPosition: "50% 50%", coverZoom: 1, updatedAt: serverTimestamp() });
+      setEvent((prev) => prev ? { ...prev, coverPhotoUrl: photo.url, coverPosition: "50% 50%", coverZoom: 1 } : prev);
       setPosition({ x: 50, y: 50 });
+      setZoom(1);
       setRepositionPhoto(photo);
       toast.success("Cover photo set — drag to reposition");
     } catch { toast.error("Failed to set cover photo"); }
@@ -219,8 +221,8 @@ export default function EventDetail() {
     if (!id || !repositionPhoto) return;
     const pos = `${position.x}% ${position.y}%`;
     try {
-      await updateDoc(doc(db, "events", id), { coverPosition: pos, updatedAt: serverTimestamp() });
-      setEvent((prev) => prev ? { ...prev, coverPosition: pos } : prev);
+      await updateDoc(doc(db, "events", id), { coverPosition: pos, coverZoom: zoom, updatedAt: serverTimestamp() });
+      setEvent((prev) => prev ? { ...prev, coverPosition: pos, coverZoom: zoom } : prev);
       setRepositionPhoto(null);
       toast.success("Position saved");
     } catch { toast.error("Failed to save position"); }
@@ -299,7 +301,11 @@ export default function EventDetail() {
         >
           {heroPhoto && (
             <img src={heroPhoto.url} alt={event.title} className="absolute inset-0 w-full h-full object-cover"
-              style={{ objectPosition: event.coverPosition || "center" }} />
+              style={{
+                objectPosition: event.coverPosition || "center",
+                transform: `scale(${event.coverZoom || 1})`,
+                transformOrigin: event.coverPosition || "center",
+              }} />
           )}
           {/* No dark overlay — title/badges moved below the hero */}
           {/* Action buttons top-right */}
@@ -683,7 +689,11 @@ export default function EventDetail() {
                 <img
                   src={repositionPhoto.url} alt=""
                   className="w-full h-full object-cover pointer-events-none"
-                  style={{ objectPosition: `${position.x}% ${position.y}%` }}
+                  style={{
+                    objectPosition: `${position.x}% ${position.y}%`,
+                    transform: `scale(${zoom})`,
+                    transformOrigin: `${position.x}% ${position.y}%`,
+                  }}
                   draggable={false}
                 />
                 {/* Crosshair focal point */}
@@ -700,6 +710,17 @@ export default function EventDetail() {
               <p className="text-xs text-center text-muted-foreground">
                 Click and drag to set focal point · {position.x}%, {position.y}%
               </p>
+              {/* Zoom slider */}
+              <div className="flex items-center gap-3">
+                <span className="text-xs text-muted-foreground w-8">Zoom</span>
+                <input
+                  type="range" min="1" max="3" step="0.05"
+                  value={zoom}
+                  onChange={(e) => setZoom(parseFloat(e.target.value))}
+                  className="flex-1 accent-violet-500"
+                />
+                <span className="text-xs text-muted-foreground w-10 text-right">{zoom.toFixed(1)}×</span>
+              </div>
             </div>
           )}
           <DialogFooter className="gap-2">
