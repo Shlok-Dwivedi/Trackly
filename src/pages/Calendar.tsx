@@ -2,7 +2,7 @@ import { useEffect, useState, useMemo, useCallback } from "react";
 import React from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Calendar as BigCalendar, dateFnsLocalizer, SlotInfo } from "react-big-calendar";
-import { format, parse, startOfWeek, getDay, toDate } from "date-fns";
+import { format, parse, startOfWeek, getDay, toDate, isToday } from "date-fns";
 import { enUS } from "date-fns/locale";
 import { collection, query, onSnapshot, orderBy } from "firebase/firestore";
 import { List, Grid3X3, Clock, Loader2 } from "lucide-react";
@@ -143,13 +143,16 @@ export default function CalendarPage() {
 
   const eventStyleGetter = useCallback((event: CalendarEvent) => {
     const bg = categoryColors[event.resource.category] || getCategoryColor(event.resource.category);
+    const isOngoing = event.resource.status?.toLowerCase() === "ongoing";
     return {
       style: {
         backgroundColor: bg,
         borderRadius: "6px",
         opacity: 0.9,
         color: getTextColor(bg),
-        border: "none",
+        border: isOngoing ? `3px solid #000` : "none",
+        outline: isOngoing ? `2px solid ${bg}` : "none",
+        outlineOffset: "1px",
         fontSize: "12px",
         padding: "2px 6px",
       },
@@ -363,9 +366,16 @@ export default function CalendarPage() {
               month: {
                 dateHeader: ({ date }: { date: Date }) => {
                   const count = eventsByDate[format(date, "yyyy-MM-dd")] || 0;
+                  const today = isToday(date);
                   return (
                     <div className="relative w-full h-full flex items-center justify-center">
-                      <span className="text-sm">{format(date, "d")}</span>
+                      {today ? (
+                        <span className="flex items-center justify-center w-6 h-6 rounded-full bg-emerald-500 text-white text-xs font-bold">
+                          ✓
+                        </span>
+                      ) : (
+                        <span className="text-sm">{format(date, "d")}</span>
+                      )}
                       {count > 0 && (
                         <span
                           className="absolute -top-1 -right-1 flex items-center justify-center rounded-full bg-violet-600 text-[9px] text-white font-bold"
