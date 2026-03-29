@@ -208,10 +208,14 @@ export default function EventDetail() {
   async function handleSetCover(photo: EventPhoto) {
     if (!id || !event) return;
     try {
-      await updateDoc(doc(db, "events", id), { coverPhotoUrl: photo.url, coverPosition: "50% 50%", coverZoom: 1, updatedAt: serverTimestamp() });
-      setEvent((prev) => prev ? { ...prev, coverPhotoUrl: photo.url, coverPosition: "50% 50%", coverZoom: 1 } : prev);
-      setPosition({ x: 50, y: 50 });
-      setZoom(1);
+      // Parse existing position if available
+      const existingPos = event.coverPosition?.split(" ");
+      const initX = existingPos ? parseInt(existingPos[0]) : 50;
+      const initY = existingPos ? parseInt(existingPos[1]) : 50;
+      await updateDoc(doc(db, "events", id), { coverPhotoUrl: photo.url, coverPosition: `${initX}% ${initY}%`, coverZoom: event.coverZoom || 1, updatedAt: serverTimestamp() });
+      setEvent((prev) => prev ? { ...prev, coverPhotoUrl: photo.url } : prev);
+      setPosition({ x: initX, y: initY });
+      setZoom(event.coverZoom || 1);
       setRepositionPhoto(photo);
       toast.success("Cover photo set — drag to reposition");
     } catch { toast.error("Failed to set cover photo"); }
