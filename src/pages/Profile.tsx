@@ -12,6 +12,7 @@ import {
   limit,
   getDocs,
   orderBy,
+  writeBatch,
 } from "firebase/firestore";
 import { updateProfile } from "firebase/auth";
 import {
@@ -30,7 +31,6 @@ import {
   Edit,
   ArrowLeft,
   LogOut,
-  Users,
 } from "lucide-react";
 import { db, auth } from "@/lib/firebase";
 import { supabase, uploadAvatar, deleteStorageFile } from "@/lib/supabase";
@@ -120,7 +120,6 @@ export default function Profile() {
   const [stats, setStats] = useState({
     assigned: 0,
     completed: 0,
-    participated: 0,
     photosUploaded: 0,
     memberSince: 0,
   });
@@ -239,10 +238,7 @@ export default function Profile() {
         setMyEvents(allUserEvents);
         const assigned = allUserEvents.length;
         const completed = allUserEvents.filter((e) => e.status === "Completed").length;
-        const participated = allUserEvents.filter((e) =>
-          e.attendees?.some((a: Attendee) => a.uid === uid)
-        ).length;
-        setStats((s) => ({ ...s, assigned, completed, participated }));
+        setStats((s) => ({ ...s, assigned, completed }));
       });
     });
     
@@ -317,6 +313,28 @@ export default function Profile() {
       );
       setEditing(false);
       toast.success("Profile updated");
+
+      // Sync displayName in all events where this user is an attendee
+      const newName = displayName.trim() || userDoc?.displayName || "";
+      if (newName) {
+        try {
+          const eventsSnap = await getDocs(
+            query(collection(db, "events"), where("assignedTo", "array-contains", uid))
+          );
+          const batch = writeBatch(db);
+          eventsSnap.docs.forEach((eventDoc) => {
+            const data = eventDoc.data();
+            const attendees: Attendee[] = data.attendees || [];
+            const updated = attendees.map((a: Attendee) =>
+              a.uid === uid ? { ...a, displayName: newName } : a
+            );
+            if (JSON.stringify(updated) !== JSON.stringify(attendees)) {
+              batch.update(eventDoc.ref, { attendees: updated });
+            }
+          });
+          await batch.commit();
+        } catch {}
+      }
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Failed to save profile");
     } finally {
@@ -681,22 +699,16 @@ export default function Profile() {
         </div>
 
         {/* B) Activity Stats */}
-        <h2 className="text-lg font-semibold text-foreground">Profile Stats</h2>
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <div className="glass-card flex flex-col gap-1">
             <Calendar className="h-5 w-5 text-primary" />
             <p className="text-2xl font-bold text-foreground">{stats.assigned}</p>
             <p className="text-xs text-muted-foreground">Events assigned</p>
           </div>
           <div className="glass-card flex flex-col gap-1">
-            <Calendar className="h-5 w-5 text-emerald-400" />
+            <Calendar className="h-5 w-5 text-primary" />
             <p className="text-2xl font-bold text-foreground">{stats.completed}</p>
             <p className="text-xs text-muted-foreground">Events completed</p>
-          </div>
-          <div className="glass-card flex flex-col gap-1">
-            <Users className="h-5 w-5 text-violet-400" />
-            <p className="text-2xl font-bold text-foreground">{stats.participated}</p>
-            <p className="text-xs text-muted-foreground">Events participated</p>
           </div>
           <div className="glass-card flex flex-col gap-1">
             <ImageIcon className="h-5 w-5 text-primary" />
