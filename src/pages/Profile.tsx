@@ -30,6 +30,7 @@ import {
   Edit,
   ArrowLeft,
   LogOut,
+  Users,
 } from "lucide-react";
 import { db, auth } from "@/lib/firebase";
 import { supabase, uploadAvatar, deleteStorageFile } from "@/lib/supabase";
@@ -119,6 +120,7 @@ export default function Profile() {
   const [stats, setStats] = useState({
     assigned: 0,
     completed: 0,
+    participated: 0,
     photosUploaded: 0,
     memberSince: 0,
   });
@@ -237,7 +239,10 @@ export default function Profile() {
         setMyEvents(allUserEvents);
         const assigned = allUserEvents.length;
         const completed = allUserEvents.filter((e) => e.status === "Completed").length;
-        setStats((s) => ({ ...s, assigned, completed }));
+        const participated = allUserEvents.filter((e) =>
+          e.attendees?.some((a: Attendee) => a.uid === uid)
+        ).length;
+        setStats((s) => ({ ...s, assigned, completed, participated }));
       });
     });
     
@@ -676,16 +681,21 @@ export default function Profile() {
         </div>
 
         {/* B) Activity Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
           <div className="glass-card flex flex-col gap-1">
             <Calendar className="h-5 w-5 text-primary" />
             <p className="text-2xl font-bold text-foreground">{stats.assigned}</p>
             <p className="text-xs text-muted-foreground">Events assigned</p>
           </div>
           <div className="glass-card flex flex-col gap-1">
-            <Calendar className="h-5 w-5 text-primary" />
+            <Calendar className="h-5 w-5 text-emerald-400" />
             <p className="text-2xl font-bold text-foreground">{stats.completed}</p>
             <p className="text-xs text-muted-foreground">Events completed</p>
+          </div>
+          <div className="glass-card flex flex-col gap-1">
+            <Users className="h-5 w-5 text-violet-400" />
+            <p className="text-2xl font-bold text-foreground">{stats.participated}</p>
+            <p className="text-xs text-muted-foreground">Events participated</p>
           </div>
           <div className="glass-card flex flex-col gap-1">
             <ImageIcon className="h-5 w-5 text-primary" />
