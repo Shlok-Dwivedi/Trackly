@@ -72,6 +72,8 @@ export default function EventDetail() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [cancelling, setCancelling] = useState(false);
+  const [repositionPhoto, setRepositionPhoto] = useState<EventPhoto | null>(null);
+  const [position, setPosition] = useState({ x: 50, y: 50 });
 
   useEffect(() => {
     if (!id) { setLoading(false); return; }
@@ -205,10 +207,23 @@ export default function EventDetail() {
   async function handleSetCover(photo: EventPhoto) {
     if (!id || !event) return;
     try {
-      await updateDoc(doc(db, "events", id), { coverPhotoUrl: photo.url, updatedAt: serverTimestamp() });
-      setEvent((prev) => prev ? { ...prev, coverPhotoUrl: photo.url } : prev);
-      toast.success("Cover photo updated");
+      await updateDoc(doc(db, "events", id), { coverPhotoUrl: photo.url, coverPosition: "50% 50%", updatedAt: serverTimestamp() });
+      setEvent((prev) => prev ? { ...prev, coverPhotoUrl: photo.url, coverPosition: "50% 50%" } : prev);
+      setPosition({ x: 50, y: 50 });
+      setRepositionPhoto(photo);
+      toast.success("Cover photo set — drag to reposition");
     } catch { toast.error("Failed to set cover photo"); }
+  }
+
+  async function handleSavePosition() {
+    if (!id || !repositionPhoto) return;
+    const pos = `${position.x}% ${position.y}%`;
+    try {
+      await updateDoc(doc(db, "events", id), { coverPosition: pos, updatedAt: serverTimestamp() });
+      setEvent((prev) => prev ? { ...prev, coverPosition: pos } : prev);
+      setRepositionPhoto(null);
+      toast.success("Position saved");
+    } catch { toast.error("Failed to save position"); }
   }
 
   async function handleJoinEvent() {
@@ -283,7 +298,8 @@ export default function EventDetail() {
           style={{ background: heroPhoto ? undefined : `${accentColor}25` }}
         >
           {heroPhoto && (
-            <img src={heroPhoto.url} alt={event.title} className="absolute inset-0 w-full h-full object-cover" />
+            <img src={heroPhoto.url} alt={event.title} className="absolute inset-0 w-full h-full object-cover"
+              style={{ objectPosition: event.coverPosition || "center" }} />
           )}
           {/* No dark overlay — title/badges moved below the hero */}
           {/* Action buttons top-right */}
@@ -632,6 +648,68 @@ export default function EventDetail() {
             <button onClick={handleCancelEvent} disabled={cancelling}
               className="flex-1 rounded-xl bg-red-600 py-2 text-sm font-semibold text-white hover:bg-red-500 disabled:opacity-60 transition-all">
               {cancelling ? "Cancelling…" : "Cancel Event"}
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reposition Modal */}
+      <Dialog open={!!repositionPhoto} onOpenChange={() => setRepositionPhoto(null)}>
+        <DialogContent className="glass-card max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="text-foreground">Reposition Cover Photo</DialogTitle>
+            <DialogDescription>Drag on the image to choose which part shows on the event card.</DialogDescription>
+          </DialogHeader>
+          {repositionPhoto && (
+            <div className="space-y-4">
+              <div
+                className="relative w-full overflow-hidden rounded-xl cursor-crosshair select-none"
+                style={{ aspectRatio: "16/9" }}
+                onMouseMove={(e) => {
+                  if (e.buttons !== 1) return;
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  const x = Math.round(((e.clientX - rect.left) / rect.width) * 100);
+                  const y = Math.round(((e.clientY - rect.top) / rect.height) * 100);
+                  setPosition({ x: Math.max(0, Math.min(100, x)), y: Math.max(0, Math.min(100, y)) });
+                }}
+                onTouchMove={(e) => {
+                  const touch = e.touches[0];
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  const x = Math.round(((touch.clientX - rect.left) / rect.width) * 100);
+                  const y = Math.round(((touch.clientY - rect.top) / rect.height) * 100);
+                  setPosition({ x: Math.max(0, Math.min(100, x)), y: Math.max(0, Math.min(100, y)) });
+                }}
+              >
+                <img
+                  src={repositionPhoto.url} alt=""
+                  className="w-full h-full object-cover pointer-events-none"
+                  style={{ objectPosition: `${position.x}% ${position.y}%` }}
+                  draggable={false}
+                />
+                {/* Crosshair focal point */}
+                <div
+                  className="absolute w-6 h-6 -translate-x-1/2 -translate-y-1/2 pointer-events-none"
+                  style={{ left: `${position.x}%`, top: `${position.y}%` }}
+                >
+                  <div className="absolute inset-0 rounded-full border-2 border-white shadow-lg" />
+                  <div className="absolute left-1/2 top-0 bottom-0 w-px bg-white/60 -translate-x-1/2" />
+                  <div className="absolute top-1/2 left-0 right-0 h-px bg-white/60 -translate-y-1/2" />
+                </div>
+                <div className="absolute inset-0 border-2 border-dashed border-white/20 rounded-xl pointer-events-none" />
+              </div>
+              <p className="text-xs text-center text-muted-foreground">
+                Click and drag to set focal point · {position.x}%, {position.y}%
+              </p>
+            </div>
+          )}
+          <DialogFooter className="gap-2">
+            <button onClick={() => setRepositionPhoto(null)}
+              className="flex-1 rounded-xl glass border border-white/10 py-2 text-sm font-medium text-foreground">
+              Cancel
+            </button>
+            <button onClick={handleSavePosition}
+              className="flex-1 rounded-xl bg-violet-600 py-2 text-sm font-semibold text-white hover:bg-violet-500 transition-all">
+              Save Position
             </button>
           </DialogFooter>
         </DialogContent>
