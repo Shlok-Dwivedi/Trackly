@@ -200,6 +200,15 @@ export default function EventDetail() {
     } finally { setExporting(false); }
   }
 
+  async function handleSetCover(photo: EventPhoto) {
+    if (!id || !event) return;
+    try {
+      await updateDoc(doc(db, "events", id), { coverPhotoUrl: photo.url, updatedAt: serverTimestamp() });
+      setEvent((prev) => prev ? { ...prev, coverPhotoUrl: photo.url } : prev);
+      toast.success("Cover photo updated");
+    } catch { toast.error("Failed to set cover photo"); }
+  }
+
   async function handleJoinEvent() {
     if (!id || !user || !event) return;
     setRequesting(true);
@@ -210,6 +219,16 @@ export default function EventDetail() {
       };
       await updateDoc(doc(db, "events", id), { attendees: arrayUnion(newAttendee), updatedAt: serverTimestamp() });
       setEvent((prev) => prev ? { ...prev, attendees: [...(prev.attendees ?? []), newAttendee] } : prev);
+      // Notify the user they've enrolled
+      await addDoc(collection(db, "notifications"), {
+        userId: user.uid,
+        title: "Enrolled successfully",
+        body: `You're now registered for "${event.title}"`,
+        eventId: id,
+        read: false,
+        createdAt: serverTimestamp(),
+        type: "enrollment",
+      }).catch(() => {});
       toast.success("You've joined this event!");
     } catch (err) { toast.error(err instanceof Error ? err.message : "Failed to join"); }
     finally { setRequesting(false); }
@@ -244,7 +263,9 @@ export default function EventDetail() {
   );
 
   const accentColor = getCategoryColor(event.category || "");
-  const heroPhoto = event.photos?.[0];
+  const heroPhoto = event.coverPhotoUrl
+    ? { url: event.coverPhotoUrl }
+    : event.photos?.[0];
 
   return (
     <Layout title={event.title} showBack>
@@ -482,6 +503,20 @@ export default function EventDetail() {
                         </p>
                       )}
                       <div className="absolute top-2 right-2 flex gap-1 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                        {(role === "admin" || role === "staff") && (
+                          <button type="button"
+                            onClick={(e) => { e.stopPropagation(); handleSetCover(photo); }}
+                            className={cn(
+                              "p-1.5 rounded-lg text-white text-[10px] font-bold transition-colors",
+                              event.coverPhotoUrl === photo.url
+                                ? "bg-violet-600"
+                                : "bg-black/60 hover:bg-violet-600"
+                            )}
+                            title="Set as cover"
+                          >
+                            ★
+                          </button>
+                        )}
                         <button type="button"
                           onClick={(e) => { e.stopPropagation(); downloadPhoto(photo.url, `${event.title}-photo-${i + 1}.jpg`); }}
                           className="p-1.5 rounded-lg bg-black/60 text-white hover:bg-black/80 transition-colors" title="Download">
