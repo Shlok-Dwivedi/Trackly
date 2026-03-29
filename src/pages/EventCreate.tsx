@@ -124,6 +124,17 @@ export default function EventCreate() {
       });
       toast.success("Event created!");
       await writeActivityLog("event_created", user.uid, user.displayName || "User", "event", docRef.id, form.title.trim(), {});
+      // Notify all assigned users
+      for (const uid of form.assignedTo) {
+        await addDoc(collection(db, "notifications"), {
+          userId: uid,
+          title: "You've been assigned to an event",
+          body: `You have been assigned to "${form.title.trim()}"`,
+          eventId: docRef.id,
+          read: false,
+          createdAt: serverTimestamp(),
+        }).catch(() => {});
+      }
       navigate(`/events/${docRef.id}`);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to create event";
