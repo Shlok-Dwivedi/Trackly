@@ -668,26 +668,57 @@ export default function EventDetail() {
         <DialogContent className="glass-card max-w-lg">
           <DialogHeader>
             <DialogTitle className="text-foreground">Reposition Cover Photo</DialogTitle>
-            <DialogDescription>Drag on the image to choose which part shows on the event card.</DialogDescription>
+            <DialogDescription>Drag the image to pan. The center crosshair shows the focal point.</DialogDescription>
           </DialogHeader>
           {repositionPhoto && (
             <div className="space-y-4">
               <div
-                className="relative w-full overflow-hidden rounded-xl cursor-crosshair select-none"
-                style={{ aspectRatio: "16/9" }}
-                onMouseMove={(e) => {
-                  if (e.buttons !== 1) return;
-                  const rect = e.currentTarget.getBoundingClientRect();
-                  const x = Math.round(((e.clientX - rect.left) / rect.width) * 100);
-                  const y = Math.round(((e.clientY - rect.top) / rect.height) * 100);
-                  setPosition({ x: Math.max(20, Math.min(80, x)), y: Math.max(20, Math.min(80, y)) });
+                className="relative w-full overflow-hidden rounded-xl cursor-grab active:cursor-grabbing select-none"
+                style={{ aspectRatio: "4/3" }}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  const startX = e.clientX;
+                  const startY = e.clientY;
+                  const startPos = { ...position };
+                  const el = e.currentTarget as HTMLElement;
+                  const onMove = (me: MouseEvent) => {
+                    const rect = el.getBoundingClientRect();
+                    const dx = ((me.clientX - startX) / rect.width) * 100;
+                    const dy = ((me.clientY - startY) / rect.height) * 100;
+                    setPosition({
+                      x: Math.max(0, Math.min(100, startPos.x - dx)),
+                      y: Math.max(0, Math.min(100, startPos.y - dy)),
+                    });
+                  };
+                  const onUp = () => {
+                    window.removeEventListener("mousemove", onMove);
+                    window.removeEventListener("mouseup", onUp);
+                  };
+                  window.addEventListener("mousemove", onMove);
+                  window.addEventListener("mouseup", onUp);
                 }}
-                onTouchMove={(e) => {
+                onTouchStart={(e) => {
                   const touch = e.touches[0];
-                  const rect = e.currentTarget.getBoundingClientRect();
-                  const x = Math.round(((touch.clientX - rect.left) / rect.width) * 100);
-                  const y = Math.round(((touch.clientY - rect.top) / rect.height) * 100);
-                  setPosition({ x: Math.max(20, Math.min(80, x)), y: Math.max(20, Math.min(80, y)) });
+                  const startX = touch.clientX;
+                  const startY = touch.clientY;
+                  const startPos = { ...position };
+                  const el = e.currentTarget as HTMLElement;
+                  const onMove = (te: TouchEvent) => {
+                    const t = te.touches[0];
+                    const rect = el.getBoundingClientRect();
+                    const dx = ((t.clientX - startX) / rect.width) * 100;
+                    const dy = ((t.clientY - startY) / rect.height) * 100;
+                    setPosition({
+                      x: Math.max(0, Math.min(100, startPos.x - dx)),
+                      y: Math.max(0, Math.min(100, startPos.y - dy)),
+                    });
+                  };
+                  const onEnd = () => {
+                    window.removeEventListener("touchmove", onMove);
+                    window.removeEventListener("touchend", onEnd);
+                  };
+                  window.addEventListener("touchmove", onMove);
+                  window.addEventListener("touchend", onEnd);
                 }}
               >
                 <img
@@ -696,30 +727,23 @@ export default function EventDetail() {
                   style={{
                     objectPosition: `${position.x}% ${position.y}%`,
                     transform: `scale(${zoom})`,
-                    transformOrigin: `${position.x}% ${position.y}%`,
+                    transformOrigin: "center center",
                   }}
                   draggable={false}
                 />
-                {/* Crosshair focal point */}
-                <div
-                  className="absolute w-6 h-6 -translate-x-1/2 -translate-y-1/2 pointer-events-none"
-                  style={{ left: `${position.x}%`, top: `${position.y}%` }}
-                >
-                  <div className="absolute inset-0 rounded-full border-2 border-white shadow-lg" />
-                  <div className="absolute left-1/2 top-0 bottom-0 w-px bg-white/60 -translate-x-1/2" />
-                  <div className="absolute top-1/2 left-0 right-0 h-px bg-white/60 -translate-y-1/2" />
+                {/* Fixed crosshair at center */}
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                  <div className="relative w-8 h-8">
+                    <div className="absolute inset-0 rounded-full border-2 border-white shadow-lg" />
+                    <div className="absolute left-1/2 top-0 bottom-0 w-px bg-white/70 -translate-x-1/2" />
+                    <div className="absolute top-1/2 left-0 right-0 h-px bg-white/70 -translate-y-1/2" />
+                  </div>
                 </div>
                 <div className="absolute inset-0 border-2 border-dashed border-white/20 rounded-xl pointer-events-none" />
-                {/* Constrained zone indicator */}
-                <div
-                  className="absolute border border-white/30 rounded-lg pointer-events-none"
-                  style={{ left: "20%", top: "20%", right: "20%", bottom: "20%" }}
-                />
               </div>
               <p className="text-xs text-center text-muted-foreground">
-                Click and drag to set focal point · {position.x}%, {position.y}%
+                Drag to pan · focal point: {position.x}%, {position.y}%
               </p>
-              {/* Zoom slider */}
               <div className="flex items-center gap-3">
                 <span className="text-xs text-muted-foreground w-8">Zoom</span>
                 <input
