@@ -306,9 +306,8 @@ export default function EventDetail() {
           {heroPhoto ? (
             <img src={heroPhoto.url} alt={event.title} className="absolute inset-0 w-full h-full object-cover"
               style={{
-                objectPosition: event.coverPosition || "center",
-                transform: `scale(${event.coverZoom || 1})`,
-                transformOrigin: event.coverPosition || "center",
+                transform: `scale(${event.coverZoom || 1}) translate(${((50 - (parseFloat(event.coverPosition?.split(" ")[0] || "50"))) / (event.coverZoom || 1))}%, ${((50 - (parseFloat(event.coverPosition?.split(" ")[1] || "50"))) / (event.coverZoom || 1))}%)`,
+                transformOrigin: "center center",
               }} />
           ) : (
             <div className="flex flex-col items-center gap-2 opacity-40">
@@ -735,8 +734,7 @@ export default function EventDetail() {
                   src={repositionPhoto.url} alt=""
                   className="w-full h-full object-cover pointer-events-none"
                   style={{
-                    objectPosition: `${position.x}% ${position.y}%`,
-                    transform: `scale(${zoom})`,
+                    transform: `scale(${zoom}) translate(${(50 - position.x) / zoom}%, ${(50 - position.y) / zoom}%)`,
                     transformOrigin: "center center",
                   }}
                   draggable={false}
