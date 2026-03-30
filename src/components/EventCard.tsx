@@ -61,8 +61,9 @@ export default function EventCard({ event, compact = false, className }: EventCa
             alt={event.title}
             className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
             style={{
-              transform: `scale(${event.coverZoom || 1}) translate(${((50 - parseFloat(event.coverPosition?.split(" ")[0] || "50")) / (event.coverZoom || 1))}%, ${((50 - parseFloat(event.coverPosition?.split(" ")[1] || "50")) / (event.coverZoom || 1))}%)`,
-              transformOrigin: "center center",
+              objectPosition: event.coverPosition || "center",
+              transform: `scale(${event.coverZoom || 1})`,
+              transformOrigin: event.coverPosition || "center",
             }}
           />
         ) : (
