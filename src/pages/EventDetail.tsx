@@ -300,16 +300,23 @@ export default function EventDetail() {
 
         {/* Hero header */}
         <div
-          className="relative h-48 md:h-64 flex items-end overflow-hidden rounded-2xl"
-          style={{ background: heroPhoto ? undefined : `${accentColor}25` }}
+          className="relative h-48 md:h-64 flex items-center justify-center overflow-hidden rounded-2xl"
+          style={{ background: heroPhoto ? undefined : `${accentColor}18` }}
         >
-          {heroPhoto && (
+          {heroPhoto ? (
             <img src={heroPhoto.url} alt={event.title} className="absolute inset-0 w-full h-full object-cover"
               style={{
                 objectPosition: event.coverPosition || "center",
                 transform: `scale(${event.coverZoom || 1})`,
                 transformOrigin: event.coverPosition || "center",
               }} />
+          ) : (
+            <div className="flex flex-col items-center gap-2 opacity-40">
+              <div className="flex h-16 w-16 items-center justify-center rounded-2xl" style={{ backgroundColor: `${accentColor}30` }}>
+                <span className="text-3xl">📅</span>
+              </div>
+              <p className="text-xs text-foreground/50">No cover photo</p>
+            </div>
           )}
           {/* No dark overlay — title/badges moved below the hero */}
           {/* Action buttons top-right */}
@@ -685,8 +692,8 @@ export default function EventDetail() {
                     const rect = el.getBoundingClientRect();
                     const dx = ((me.clientX - startX) / rect.width) * 100 / zoom;
                     const dy = ((me.clientY - startY) / rect.height) * 100 / zoom;
-                    // At higher zoom, allow panning further beyond 0-100
-                    const extra = ((zoom - 1) / zoom) * 50;
+                    // At zoom z, image overflows by (z-1)*50% on each side
+                    const extra = (zoom - 1) * 50;
                     setPosition({
                       x: Math.max(-extra, Math.min(100 + extra, startPos.x - dx)),
                       y: Math.max(-extra, Math.min(100 + extra, startPos.y - dy)),
@@ -710,7 +717,7 @@ export default function EventDetail() {
                     const rect = el.getBoundingClientRect();
                     const dx = ((t.clientX - startX) / rect.width) * 100 / zoom;
                     const dy = ((t.clientY - startY) / rect.height) * 100 / zoom;
-                    const extra = ((zoom - 1) / zoom) * 50;
+                    const extra = (zoom - 1) * 50;
                     setPosition({
                       x: Math.max(-extra, Math.min(100 + extra, startPos.x - dx)),
                       y: Math.max(-extra, Math.min(100 + extra, startPos.y - dy)),
