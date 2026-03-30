@@ -683,8 +683,9 @@ export default function EventDetail() {
                   const el = e.currentTarget as HTMLElement;
                   const onMove = (me: MouseEvent) => {
                     const rect = el.getBoundingClientRect();
-                    const dx = ((me.clientX - startX) / rect.width) * 100;
-                    const dy = ((me.clientY - startY) / rect.height) * 100;
+                    // Divide by zoom so dragging feels natural at any zoom level
+                    const dx = ((me.clientX - startX) / rect.width) * 100 / zoom;
+                    const dy = ((me.clientY - startY) / rect.height) * 100 / zoom;
                     setPosition({
                       x: Math.max(0, Math.min(100, startPos.x - dx)),
                       y: Math.max(0, Math.min(100, startPos.y - dy)),
@@ -706,8 +707,8 @@ export default function EventDetail() {
                   const onMove = (te: TouchEvent) => {
                     const t = te.touches[0];
                     const rect = el.getBoundingClientRect();
-                    const dx = ((t.clientX - startX) / rect.width) * 100;
-                    const dy = ((t.clientY - startY) / rect.height) * 100;
+                    const dx = ((t.clientX - startX) / rect.width) * 100 / zoom;
+                    const dy = ((t.clientY - startY) / rect.height) * 100 / zoom;
                     setPosition({
                       x: Math.max(0, Math.min(100, startPos.x - dx)),
                       y: Math.max(0, Math.min(100, startPos.y - dy)),
