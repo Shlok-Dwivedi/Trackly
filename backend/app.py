@@ -73,7 +73,7 @@ def create_app() -> Flask:
         supabase_key = os.getenv("SUPABASE_ANON_KEY")
         try:
             req = urllib.request.Request(
-                f"{supabase_url}/storage/v1/bucket",
+                f"{supabase_url}/rest/v1/",
                 headers={"apikey": supabase_key}
             )
             urllib.request.urlopen(req, timeout=5)
