@@ -223,7 +223,7 @@ export default function EventDetail() {
 
   async function handleSavePosition() {
     if (!id || !repositionPhoto) return;
-    const pos = `${position.x}% ${position.y}%`;
+    const pos = `${Math.round(position.x)}% ${Math.round(position.y)}%`;
     try {
       await updateDoc(doc(db, "events", id), { coverPosition: pos, coverZoom: zoom, updatedAt: serverTimestamp() });
       setEvent((prev) => prev ? { ...prev, coverPosition: pos, coverZoom: zoom } : prev);
@@ -683,12 +683,13 @@ export default function EventDetail() {
                   const el = e.currentTarget as HTMLElement;
                   const onMove = (me: MouseEvent) => {
                     const rect = el.getBoundingClientRect();
-                    // Divide by zoom so dragging feels natural at any zoom level
                     const dx = ((me.clientX - startX) / rect.width) * 100 / zoom;
                     const dy = ((me.clientY - startY) / rect.height) * 100 / zoom;
+                    // At higher zoom, allow panning further beyond 0-100
+                    const extra = ((zoom - 1) / zoom) * 50;
                     setPosition({
-                      x: Math.max(0, Math.min(100, startPos.x - dx)),
-                      y: Math.max(0, Math.min(100, startPos.y - dy)),
+                      x: Math.max(-extra, Math.min(100 + extra, startPos.x - dx)),
+                      y: Math.max(-extra, Math.min(100 + extra, startPos.y - dy)),
                     });
                   };
                   const onUp = () => {
@@ -709,9 +710,10 @@ export default function EventDetail() {
                     const rect = el.getBoundingClientRect();
                     const dx = ((t.clientX - startX) / rect.width) * 100 / zoom;
                     const dy = ((t.clientY - startY) / rect.height) * 100 / zoom;
+                    const extra = ((zoom - 1) / zoom) * 50;
                     setPosition({
-                      x: Math.max(0, Math.min(100, startPos.x - dx)),
-                      y: Math.max(0, Math.min(100, startPos.y - dy)),
+                      x: Math.max(-extra, Math.min(100 + extra, startPos.x - dx)),
+                      y: Math.max(-extra, Math.min(100 + extra, startPos.y - dy)),
                     });
                   };
                   const onEnd = () => {
@@ -743,7 +745,7 @@ export default function EventDetail() {
                 <div className="absolute inset-0 border-2 border-dashed border-white/20 rounded-xl pointer-events-none" />
               </div>
               <p className="text-xs text-center text-muted-foreground">
-                Drag to pan · focal point: {position.x}%, {position.y}%
+                Drag to pan · focal point: {Math.round(position.x)}%, {Math.round(position.y)}%
               </p>
               <div className="flex items-center gap-3">
                 <span className="text-xs text-muted-foreground w-8">Zoom</span>
