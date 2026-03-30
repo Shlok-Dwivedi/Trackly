@@ -306,8 +306,9 @@ export default function EventDetail() {
           {heroPhoto ? (
             <img src={heroPhoto.url} alt={event.title} className="absolute inset-0 w-full h-full object-cover"
               style={{
-                transform: `scale(${event.coverZoom || 1}) translate(${((50 - (parseFloat(event.coverPosition?.split(" ")[0] || "50"))) / (event.coverZoom || 1))}%, ${((50 - (parseFloat(event.coverPosition?.split(" ")[1] || "50"))) / (event.coverZoom || 1))}%)`,
-                transformOrigin: "center center",
+                objectPosition: event.coverPosition || "center",
+                transform: `scale(${event.coverZoom || 1})`,
+                transformOrigin: event.coverPosition || "center",
               }} />
           ) : (
             <div className="flex flex-col items-center gap-2 opacity-40">
@@ -689,13 +690,13 @@ export default function EventDetail() {
                   const el = e.currentTarget as HTMLElement;
                   const onMove = (me: MouseEvent) => {
                     const rect = el.getBoundingClientRect();
-                    const dx = ((me.clientX - startX) / rect.width) * 100 / zoom;
-                    const dy = ((me.clientY - startY) / rect.height) * 100 / zoom;
-                    // At zoom z, image overflows by (z-1)*50% on each side
-                    const extra = (zoom - 1) * 50;
+                    // sensitivity: less movement needed at higher zoom
+                    const sensitivity = 1 / zoom;
+                    const dx = ((me.clientX - startX) / rect.width) * 100 * sensitivity;
+                    const dy = ((me.clientY - startY) / rect.height) * 100 * sensitivity;
                     setPosition({
-                      x: Math.max(-extra, Math.min(100 + extra, startPos.x - dx)),
-                      y: Math.max(-extra, Math.min(100 + extra, startPos.y - dy)),
+                      x: Math.max(0, Math.min(100, startPos.x - dx)),
+                      y: Math.max(0, Math.min(100, startPos.y - dy)),
                     });
                   };
                   const onUp = () => {
@@ -714,12 +715,12 @@ export default function EventDetail() {
                   const onMove = (te: TouchEvent) => {
                     const t = te.touches[0];
                     const rect = el.getBoundingClientRect();
-                    const dx = ((t.clientX - startX) / rect.width) * 100 / zoom;
-                    const dy = ((t.clientY - startY) / rect.height) * 100 / zoom;
-                    const extra = (zoom - 1) * 50;
+                    const sensitivity = 1 / zoom;
+                    const dx = ((t.clientX - startX) / rect.width) * 100 * sensitivity;
+                    const dy = ((t.clientY - startY) / rect.height) * 100 * sensitivity;
                     setPosition({
-                      x: Math.max(-extra, Math.min(100 + extra, startPos.x - dx)),
-                      y: Math.max(-extra, Math.min(100 + extra, startPos.y - dy)),
+                      x: Math.max(0, Math.min(100, startPos.x - dx)),
+                      y: Math.max(0, Math.min(100, startPos.y - dy)),
                     });
                   };
                   const onEnd = () => {
@@ -734,8 +735,9 @@ export default function EventDetail() {
                   src={repositionPhoto.url} alt=""
                   className="w-full h-full object-cover pointer-events-none"
                   style={{
-                    transform: `scale(${zoom}) translate(${(50 - position.x) / zoom}%, ${(50 - position.y) / zoom}%)`,
-                    transformOrigin: "center center",
+                    objectPosition: `${position.x}% ${position.y}%`,
+                    transform: `scale(${zoom})`,
+                    transformOrigin: `${position.x}% ${position.y}%`,
                   }}
                   draggable={false}
                 />
