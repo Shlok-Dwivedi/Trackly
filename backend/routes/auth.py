@@ -86,3 +86,38 @@ def set_role():
                 "details": str(exc),
             }
         ), 500
+
+
+@auth_bp.route("/delete-user", methods=["POST"])
+def delete_user():
+    """
+    POST /api/auth/delete-user
+    Body: { "uid": "<firebase uid>" }
+    Requires admin Authorization header.
+    Deletes the Firebase Auth account so the user can re-register.
+    """
+    data = request.get_json(silent=True) or {}
+    uid = data.get("uid")
+    if not uid:
+        return jsonify({"error": "uid is required"}), 400
+
+    try:
+        id_token = _extract_bearer_token()
+        decoded = verify_id_token(id_token)
+        caller_uid = decoded.get("uid") or decoded.get("user_id")
+        caller_role = decoded.get("role")
+        if not caller_role and caller_uid:
+            db = get_firestore_client()
+            d = db.collection("users").document(caller_uid).get()
+            if d.exists:
+                caller_role = (d.to_dict() or {}).get("role")
+        if caller_role != "admin":
+            return jsonify({"error": "Forbidden: admin role required"}), 403
+    except Exception as exc:
+        return jsonify({"error": "Unauthorized", "details": str(exc)}), 401
+
+    try:
+        firebase_auth.delete_user(uid)
+        return jsonify({"uid": uid, "status": "deleted"}), 200
+    except Exception as exc:
+        return jsonify({"error": "Failed to delete user", "details": str(exc)}), 500
