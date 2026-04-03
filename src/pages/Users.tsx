@@ -282,10 +282,14 @@ export default function Users() {
       if (eventChanges > 0) await eventBatch.commit();
 
       // 4. Delete Firebase Auth account via backend
-      if (FLASK_BASE) {
+      if (FLASK_BASE && auth.currentUser) {
+        const idToken = await auth.currentUser.getIdToken(true);
         await fetch(`${FLASK_BASE}/api/auth/delete-user`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${idToken}`,
+          },
           body: JSON.stringify({ uid: u.uid }),
         }).catch(() => {});
       }
