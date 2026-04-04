@@ -75,6 +75,8 @@ export default function EventDetail() {
   const [repositionPhoto, setRepositionPhoto] = useState<EventPhoto | null>(null);
   const [position, setPosition] = useState({ x: 50, y: 50 });
   const [zoom, setZoom] = useState(1);
+  const [showCommitteeModal, setShowCommitteeModal] = useState(false);
+  const [eventCommittees, setEventCommittees] = useState<{ id: string; name: string; color: string }[]>([]);
 
   useEffect(() => {
     if (!id) { setLoading(false); return; }
@@ -105,6 +107,16 @@ export default function EventDetail() {
     }
     checkJoinRequest();
   }, [id, user]);
+
+  // Load committees for this event
+  useEffect(() => {
+    if (!event?.committees?.length) return;
+    getDocs(query(collection(db, "committees"))).then((snap) => {
+      const all = snap.docs.map((d) => ({ id: d.id, name: d.data().name as string, color: d.data().color as string }));
+      setEventCommittees(all.filter((c) => event.committees!.includes(c.id)));
+    }).catch(() => {});
+  }, [event?.committees?.join(",")]);
+
 
   async function handlePhotoUploaded(result: { url: string; storagePath: string }) {
     if (!user || !id || !event) return;
@@ -232,27 +244,25 @@ export default function EventDetail() {
     } catch { toast.error("Failed to save position"); }
   }
 
-  async function handleJoinEvent() {
+  async function handleJoinEvent(committeeId?: string, committeeName?: string) {
     if (!id || !user || !event) return;
     setRequesting(true);
     try {
       const newAttendee: Attendee = {
         uid: user.uid, displayName: user.displayName || "Unknown",
         photoURL: user.photoURL || "", joinedAt: Date.now(), joinType: "enrolled",
+        committeeId, committeeName,
       };
       await updateDoc(doc(db, "events", id), { attendees: arrayUnion(newAttendee), updatedAt: serverTimestamp() });
       setEvent((prev) => prev ? { ...prev, attendees: [...(prev.attendees ?? []), newAttendee] } : prev);
-      // Notify the user they've enrolled
       await addDoc(collection(db, "notifications"), {
         userId: user.uid,
         title: "Enrolled successfully",
-        body: `You're now registered for "${event.title}"`,
-        eventId: id,
-        read: false,
-        createdAt: serverTimestamp(),
-        type: "enrollment",
+        body: `You're now registered for "${event.title}"${committeeName ? ` (${committeeName})` : ""}`,
+        eventId: id, read: false, createdAt: serverTimestamp(), type: "enrollment",
       }).catch(() => {});
       toast.success("You've joined this event!");
+      setShowCommitteeModal(false);
     } catch (err) { toast.error(err instanceof Error ? err.message : "Failed to join"); }
     finally { setRequesting(false); }
   }
@@ -455,7 +465,7 @@ export default function EventDetail() {
                     )}
                   </div>
                 ) : canJoin ? (
-                  <button onClick={handleJoinEvent} disabled={requesting}
+                  <button onClick={() => eventCommittees.length > 0 ? setShowCommitteeModal(true) : handleJoinEvent()} disabled={requesting}
                     className="flex items-center gap-2 rounded-xl gradient-primary px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-violet-500/20 hover:opacity-90 disabled:opacity-60 transition-all">
                     <UserPlus className="h-4 w-4" />
                     {requesting ? "Joining…" : "Join Event"}
@@ -483,6 +493,7 @@ export default function EventDetail() {
                     )}
                     <span className="text-xs text-foreground">{a.displayName}</span>
                     {a.joinType === "assigned" && <span className="text-[10px] text-muted-foreground">(assigned)</span>}
+                    {a.committeeName && <span className="text-[10px] text-violet-400">({a.committeeName})</span>}
                   </div>
                 ))}
               </div>
@@ -667,6 +678,30 @@ export default function EventDetail() {
               {cancelling ? "Cancelling…" : "Cancel Event"}
             </button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Committee Selection Modal */}
+      <Dialog open={showCommitteeModal} onOpenChange={setShowCommitteeModal}>
+        <DialogContent className="glass-card max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-foreground">Select a Committee</DialogTitle>
+            <DialogDescription>Choose which committee you're joining this event as.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            {eventCommittees.map((c) => (
+              <button key={c.id} onClick={() => handleJoinEvent(c.id, c.name)}
+                disabled={requesting}
+                className="w-full flex items-center gap-3 p-3 rounded-xl border border-white/10 hover:border-violet-500/40 hover:bg-violet-500/05 transition-all text-left disabled:opacity-60">
+                <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: c.color }} />
+                <span className="text-sm font-medium text-foreground">{c.name}</span>
+              </button>
+            ))}
+            <button onClick={() => handleJoinEvent()} disabled={requesting}
+              className="w-full flex items-center gap-3 p-3 rounded-xl border border-white/10 hover:border-white/20 transition-all text-left text-sm text-muted-foreground disabled:opacity-60">
+              Join without a committee
+            </button>
+          </div>
         </DialogContent>
       </Dialog>
 
