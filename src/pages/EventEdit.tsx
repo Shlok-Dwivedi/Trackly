@@ -16,7 +16,7 @@ const ENROLLMENT_OPTIONS: { value: EnrollmentType; label: string }[] = [
 ];
 
 const inputClass =
-  "w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-violet-500/40 focus:border-violet-500/40 transition-all";
+  "w-full rounded-xl border border-white/10 bg-white/05 px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-violet-500/40 focus:border-violet-500/40 transition-all";
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -52,10 +52,13 @@ export default function EventEdit() {
   const [enrollmentType, setEnrollmentType] = useState<EnrollmentType>("assigned");
   const [capacity, setCapacity] = useState(0);
   const [assignedTo, setAssignedTo] = useState<string[]>([]);
+  const [eventCommittees, setEventCommittees] = useState<string[]>([]); // committee IDs for this event
   const [users, setUsers] = useState<FirestoreUser[]>([]);
   const [userSearch, setUserSearch] = useState("");
   const [showUserDropdown, setShowUserDropdown] = useState(false);
   const [categoryOptions, setCategoryOptions] = useState<{ name: string; color: string }[]>([]);
+  const [committeeOptions, setCommitteeOptions] = useState<{ id: string; name: string; color: string }[]>([]);
+  const [assigneeCommittees, setAssigneeCommittees] = useState<Record<string, string>>({}); // uid → committeeId
 
   const isAdminStaff = role === "admin" || role === "staff";
 
@@ -71,6 +74,16 @@ export default function EventEdit() {
     const unsub = onSnapshot(
       query(collection(db, "eventCategories"), orderBy("createdAt", "asc")),
       (snap) => setCategoryOptions(snap.docs.map((d) => ({ name: d.data().name as string, color: d.data().color as string }))),
+      () => {}
+    );
+    return unsub;
+  }, []);
+
+  // Live committees
+  useEffect(() => {
+    const unsub = onSnapshot(
+      query(collection(db, "committees"), orderBy("createdAt", "asc")),
+      (snap) => setCommitteeOptions(snap.docs.map((d) => ({ id: d.id, name: d.data().name as string, color: d.data().color as string }))),
       () => {}
     );
     return unsub;
@@ -92,6 +105,13 @@ export default function EventEdit() {
         setEnrollmentType(data.enrollmentType ?? "assigned");
         setCapacity(data.capacity ?? 0);
         setAssignedTo(data.assignedTo ?? []);
+        setEventCommittees(data.committees ?? []);
+        // Restore per-assignee committees from existing attendees
+        const existing: Record<string, string> = {};
+        (data.attendees ?? []).forEach((a: { uid: string; committeeId?: string }) => {
+          if (a.committeeId) existing[a.uid] = a.committeeId;
+        });
+        setAssigneeCommittees(existing);
       }
       setLoading(false);
     }).catch(() => setLoading(false));
@@ -118,17 +138,20 @@ export default function EventEdit() {
       const attendees: Attendee[] = assignedTo.map((uid) => {
         const u = users.find((x) => x.uid === uid);
         const existing = event?.attendees?.find((a) => a.uid === uid);
+        const committeeId = assigneeCommittees[uid];
+        const committee = committeeOptions.find((c) => c.id === committeeId);
         return {
           uid, displayName: u?.displayName || "Unknown",
           joinedAt: existing?.joinedAt || Date.now(),
           joinType: existing?.joinType || "assigned" as const,
+          committeeId, committeeName: committee?.name,
         };
       });
       await updateDoc(doc(db, "events", id), {
         title: title.trim(), description: description.trim(), location: location.trim(),
         startDate: new Date(startDate).getTime(), endDate: new Date(endDate).getTime(),
         category, tags: tags.split(",").map((t) => t.trim()).filter(Boolean),
-        enrollmentType, capacity, assignedTo, attendees, updatedAt: serverTimestamp(),
+        enrollmentType, capacity, assignedTo, attendees, committees: eventCommittees, updatedAt: serverTimestamp(),
       });
       // Notify newly assigned users
       const newAssigned = assignedTo.filter((uid) => !(event?.assignedTo || []).includes(uid));
@@ -221,6 +244,30 @@ export default function EventEdit() {
 
           {isAdminStaff && (
             <div className="glass-card space-y-4">
+              {committeeOptions.length > 0 && (
+                <div className="space-y-3">
+                  <h3 className="text-sm font-semibold text-foreground">Committees</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {committeeOptions.map((c) => {
+                      const selected = eventCommittees.includes(c.id);
+                      return (
+                        <button key={c.id} type="button"
+                          onClick={() => setEventCommittees((p) => selected ? p.filter((id) => id !== c.id) : [...p, c.id])}
+                          className="flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition-all border"
+                          style={{
+                            backgroundColor: selected ? `${c.color}30` : "transparent",
+                            borderColor: selected ? c.color : "rgba(255,255,255,0.1)",
+                            color: selected ? c.color : "hsl(var(--muted-foreground))",
+                          }}>
+                          <span className="w-2 h-2 rounded-full" style={{ backgroundColor: c.color }} />
+                          {c.name}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               <h3 className="text-sm font-semibold text-foreground">Enrollment Settings</h3>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <Field label="Enrollment Type">
@@ -236,13 +283,31 @@ export default function EventEdit() {
               <Field label="Assign To">
                 <div className="relative">
                   {assignedUsers.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5 mb-2">
-                      {assignedUsers.map((u) => (
-                        <span key={u.uid} className="inline-flex items-center gap-1 rounded-full bg-violet-500/20 text-violet-300 px-2.5 py-1 text-xs">
-                          {u.displayName}
-                          <button type="button" onClick={() => toggleUser(u.uid)}><X className="h-3 w-3" /></button>
-                        </span>
-                      ))}
+                    <div className="space-y-1.5 mb-2">
+                      {assignedUsers.map((u) => {
+                        const selCommittee = committeeOptions.find((c) => c.id === assigneeCommittees[u.uid]);
+                        return (
+                          <div key={u.uid} className="flex items-center gap-2 rounded-xl bg-violet-500/10 px-2.5 py-1.5">
+                            <span className="text-xs font-medium text-violet-300 flex-1">{u.displayName}</span>
+                            {committeeOptions.length > 0 && (
+                              <select
+                                value={assigneeCommittees[u.uid] || ""}
+                                onChange={(e) => setAssigneeCommittees((p) => ({ ...p, [u.uid]: e.target.value }))}
+                                className="rounded-lg border border-white/10 bg-background text-xs text-foreground px-2 py-1 focus:outline-none"
+                                style={{ borderColor: selCommittee ? selCommittee.color : undefined }}
+                              >
+                                <option value="">No committee</option>
+                                {committeeOptions.map((c) => (
+                                  <option key={c.id} value={c.id}>{c.name}</option>
+                                ))}
+                              </select>
+                            )}
+                            <button type="button" onClick={() => toggleUser(u.uid)} className="hover:text-white text-violet-300/60 ml-0.5">
+                              <X className="h-3 w-3" />
+                            </button>
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
                   <div className="relative">
