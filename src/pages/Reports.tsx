@@ -1,61 +1,64 @@
 import { useEffect, useState, useMemo } from "react";
 import { collection, getDocs, query, orderBy } from "firebase/firestore";
 import {
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer,
+  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
+  ResponsiveContainer, BarChart, Bar, Legend,
 } from "recharts";
-import { CalendarDays, Users, CheckCircle, TrendingUp, Loader2, X } from "lucide-react";
+import { CalendarDays, Users, CheckCircle, TrendingUp, Loader2, X, ChevronRight } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { db } from "@/lib/firebase";
 import { FirestoreEvent } from "@/types";
 import Layout from "@/components/layout/Layout";
 import StatusBadge from "@/components/StatusBadge";
 import { BarChartComponent, DonutChart } from "@/components/charts/Charts";
+import { cn } from "@/lib/utils";
 
 const MONTH_LABELS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const STATUS_COLORS: Record<string, string> = { Planned: "#8B5CF6", Ongoing: "#EC4899", Completed: "#10B981" };
 
-const STATUS_COLORS: Record<string, string> = {
-  Planned: "#8B5CF6",
-  Ongoing: "#EC4899",
-  Completed: "#F59E0B",
-};
-
-// Safely convert Firestore Timestamp | number | undefined → milliseconds
 function toMs(val: unknown): number {
   if (!val) return 0;
-  if (typeof val === "object" && val !== null && "toMillis" in val) {
+  if (typeof val === "object" && val !== null && "toMillis" in val)
     return (val as { toMillis: () => number }).toMillis();
-  }
-  if (typeof val === "number") {
-    return val < 1e12 ? val * 1000 : val; // handle seconds vs ms
-  }
+  if (typeof val === "number") return val < 1e12 ? val * 1000 : val;
   return 0;
 }
 
 function buildVolunteerData(events: FirestoreEvent[]) {
-  // Map of month → Set of unique user IDs
   const map: Record<number, Set<string>> = {};
   events.forEach((e) => {
     const ms = toMs(e.startDate);
     if (!ms) return;
     const m = new Date(ms).getMonth();
     if (!map[m]) map[m] = new Set();
-    // Add assigned users
     (e.assignedTo || []).forEach((uid: string) => map[m].add(uid));
-    // Add attendees — Set deduplicates automatically
     (e.attendees || []).forEach((a: { uid: string }) => map[m].add(a.uid));
   });
-  // Last 6 months rolling window
   const currentMonth = new Date().getMonth();
   const last6 = Array.from({ length: 6 }, (_, i) => (currentMonth - 5 + i + 12) % 12);
   return last6.map((i) => ({ name: MONTH_LABELS[i], value: map[i]?.size ?? 0 }));
 }
 
+function CustomTooltip({ active, payload, label }: { active?: boolean; payload?: { value: number; name?: string; color?: string }[]; label?: string }) {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className="glass-card !p-3 !rounded-xl border border-violet-500/20 text-sm space-y-1">
+      <p className="text-muted-foreground text-xs mb-1">{label}</p>
+      {payload.map((p, i) => (
+        <p key={i} className="font-bold" style={{ color: p.color }}>{p.name ? `${p.name}: ` : ""}{p.value}</p>
+      ))}
+    </div>
+  );
+}
+
+type CompareMode = "month" | "year" | "event";
+
 export default function Reports() {
   const [events, setEvents] = useState<FirestoreEvent[]>([]);
   const [loading, setLoading] = useState(true);
-  const [lineDetail, setLineDetail] = useState<{ name: string; value: number } | null>(null);
   const [userNames, setUserNames] = useState<Record<string, string>>({});
+  const [selectedEvent, setSelectedEvent] = useState<FirestoreEvent | null>(null);
+  const [compareMode, setCompareMode] = useState<CompareMode>("month");
 
   useEffect(() => {
     async function load() {
@@ -76,11 +79,8 @@ export default function Reports() {
           });
           setUserNames(names);
         }
-      } catch {
-        setEvents(demoEvents);
-      } finally {
-        setLoading(false);
-      }
+      } catch { setEvents(demoEvents); }
+      finally { setLoading(false); }
     }
     load();
   }, []);
@@ -100,8 +100,8 @@ export default function Reports() {
     });
     return seen.size;
   }, [events]);
-  const completionRate = totalEvents > 0
-    ? Math.round((statusCounts.Completed / totalEvents) * 100) : 0;
+
+  const completionRate = totalEvents > 0 ? Math.round((statusCounts.Completed / totalEvents) * 100) : 0;
 
   const monthlyData = useMemo(() => {
     const map: Record<number, number> = {};
@@ -123,9 +123,8 @@ export default function Reports() {
   }, [monthlyData]);
 
   const statusData = useMemo(() =>
-    Object.entries(statusCounts).map(([name, value]) => ({
-      name, value, color: STATUS_COLORS[name],
-    })), [statusCounts]
+    Object.entries(statusCounts).map(([name, value]) => ({ name, value, color: STATUS_COLORS[name] })),
+    [statusCounts]
   );
 
   const catMap: Record<string, number> = {};
@@ -139,29 +138,59 @@ export default function Reports() {
     staffMap[e.createdBy].created++;
     if (e.status === "Completed") staffMap[e.createdBy].completed++;
   });
-  const staffData = Object.entries(staffMap).map(([uid, s]) => ({
-    name: userNames[uid] || uid.slice(0, 12) + "…",
-    ...s,
-  }));
+  const staffData = Object.entries(staffMap).map(([uid, s]) => ({ name: userNames[uid] || uid.slice(0, 12) + "…", ...s }));
 
   const volunteerData = useMemo(() => buildVolunteerData(events), [events]);
 
+  // Comparison data
+  const monthCompareData = useMemo(() => {
+    const thisYear = new Date().getFullYear();
+    const map: Record<number, { thisYear: number; lastYear: number }> = {};
+    events.forEach((e) => {
+      const ms = toMs(e.startDate);
+      if (!ms) return;
+      const d = new Date(ms);
+      const m = d.getMonth();
+      const y = d.getFullYear();
+      if (!map[m]) map[m] = { thisYear: 0, lastYear: 0 };
+      if (y === thisYear) map[m].thisYear++;
+      else if (y === thisYear - 1) map[m].lastYear++;
+    });
+    return MONTH_LABELS.map((name, i) => ({ name, thisYear: map[i]?.thisYear ?? 0, lastYear: map[i]?.lastYear ?? 0 }));
+  }, [events]);
+
+  const yearCompareData = useMemo(() => {
+    const map: Record<number, number> = {};
+    events.forEach((e) => {
+      const ms = toMs(e.startDate);
+      if (!ms) return;
+      const y = new Date(ms).getFullYear();
+      map[y] = (map[y] ?? 0) + 1;
+    });
+    return Object.entries(map).sort(([a], [b]) => Number(a) - Number(b))
+      .map(([year, count]) => ({ name: year, value: count }));
+  }, [events]);
+
+  const top5Events = useMemo(() =>
+    [...events]
+      .sort((a, b) => ((b.attendees?.length ?? 0) + (b.assignedTo?.length ?? 0)) - ((a.attendees?.length ?? 0) + (a.assignedTo?.length ?? 0)))
+      .slice(0, 5)
+      .map((e) => ({ name: e.title.slice(0, 20), participants: (e.attendees?.length ?? 0) + (e.assignedTo?.length ?? 0) })),
+    [events]
+  );
+
   const statCards = [
-    { icon: CalendarDays, label: "Total Events", value: totalEvents, color: "#8B5CF6" },
-    { icon: Users, label: "Total Participants", value: totalParticipants, color: "#EC4899" },
-    { icon: CheckCircle, label: "Completion Rate", value: `${completionRate}%`, color: "#10B981" },
-    { icon: TrendingUp, label: "Growth Rate", value: `${growthRate >= 0 ? "+" : ""}${growthRate}%`, color: "#F59E0B" },
+    { icon: CalendarDays, label: "Total Events",      value: totalEvents,          color: "#8B5CF6", bg: "rgba(139,92,246,0.12)" },
+    { icon: Users,        label: "Total Participants", value: totalParticipants,    color: "#EC4899", bg: "rgba(236,72,153,0.12)" },
+    { icon: CheckCircle,  label: "Completion Rate",   value: `${completionRate}%`, color: "#10B981", bg: "rgba(16,185,129,0.12)" },
+    { icon: TrendingUp,   label: "Growth Rate",       value: `${growthRate >= 0 ? "+" : ""}${growthRate}%`, color: "#F59E0B", bg: "rgba(245,158,11,0.12)" },
   ];
 
-  if (loading) {
-    return (
-      <Layout title="Reports">
-        <div className="flex justify-center py-24">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        </div>
-      </Layout>
-    );
-  }
+  if (loading) return (
+    <Layout title="Reports">
+      <div className="flex justify-center py-24"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
+    </Layout>
+  );
 
   return (
     <Layout title="Reports">
@@ -171,16 +200,19 @@ export default function Reports() {
           <p className="text-sm text-muted-foreground mt-0.5">Analytics and insights for your events</p>
         </div>
 
-        {/* 4 Summary stat cards */}
+        {/* Stat cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {statCards.map(({ icon: Icon, label, value, color }) => (
-            <div key={label} className="glass-card text-center">
-              <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-xl" style={{ backgroundColor: `${color}20` }}>
-                <Icon className="h-5 w-5" style={{ color }} />
+          {statCards.map(({ icon: Icon, label, value, color, bg }, i) => (
+            <motion.div key={label} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: i * 0.07 }} className="glass-card flex items-center gap-4">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl" style={{ backgroundColor: bg }}>
+                <Icon className="h-6 w-6" style={{ color }} />
               </div>
-              <p className="text-2xl font-bold text-foreground">{value}</p>
-              <p className="text-xs text-muted-foreground mt-1">{label}</p>
-            </div>
+              <div>
+                <p className="text-2xl font-bold text-foreground">{value}</p>
+                <p className="text-xs text-muted-foreground">{label}</p>
+              </div>
+            </motion.div>
           ))}
         </div>
 
@@ -190,42 +222,82 @@ export default function Reports() {
           <BarChartComponent title="Events per Month" data={monthlyData} />
         </div>
 
-        {/* Volunteer Participation line chart */}
-        <div className="glass-card p-4 sm:p-6 relative">
-          <h3 className="font-semibold mb-4 text-foreground">Volunteer Participation</h3>
-          <div className="h-64 relative">
+        {/* Volunteer Participation */}
+        <div className="glass-card p-4 sm:p-6">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h3 className="font-semibold text-foreground">Volunteer Participation</h3>
+              <p className="text-xs text-muted-foreground mt-0.5">Unique participants per month</p>
+            </div>
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground bg-violet-500/10 px-3 py-1.5 rounded-full">
+              <span className="w-2 h-2 rounded-full bg-violet-500" /> Volunteers
+            </div>
+          </div>
+          <div className="h-56">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={volunteerData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
+              <AreaChart data={volunteerData}>
+                <defs>
+                  <linearGradient id="volGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#8B5CF6" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="#8B5CF6" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
                 <XAxis dataKey="name" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} axisLine={false} tickLine={false} />
-                <Tooltip contentStyle={{ background: "rgba(15,12,41,0.92)", border: "1px solid rgba(139,92,246,0.25)", borderRadius: "12px" }} />
-                <Line type="monotone" dataKey="value" stroke="#8B5CF6" strokeWidth={2.5}
-                  dot={{ fill: "#8B5CF6", strokeWidth: 2, r: 4, cursor: "pointer" }}
-                  activeDot={{ r: 6, cursor: "pointer",
-                    onClick: ((_: unknown, p: unknown) => {
-                      const pay = (p as { payload?: { name: string; value: number } })?.payload;
-                      if (pay) setLineDetail(pay);
-                    }) as never,
-                  }}
-                />
-              </LineChart>
+                <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} axisLine={false} tickLine={false} allowDecimals={false} />
+                <Tooltip content={<CustomTooltip />} />
+                <Area type="monotone" dataKey="value" stroke="#8B5CF6" strokeWidth={2.5} fill="url(#volGrad)"
+                  dot={{ fill: "#8B5CF6", strokeWidth: 2, r: 4 }} activeDot={{ r: 6, fill: "#8B5CF6" }} />
+              </AreaChart>
             </ResponsiveContainer>
-            <AnimatePresence>
-              {lineDetail && (
-                <motion.div initial={{ opacity: 0, scale: 0.85 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.85 }} transition={{ duration: 0.2 }}
-                  className="absolute inset-0 flex items-center justify-center z-20">
-                  <div className="glass-card p-5 rounded-xl relative text-center min-w-[170px] shadow-2xl border border-violet-500/20">
-                    <button onClick={() => setLineDetail(null)} className="absolute top-2 right-2 p-1 rounded-full hover:bg-white/10 transition-colors">
-                      <X className="h-3.5 w-3.5 text-muted-foreground" />
-                    </button>
-                    <p className="text-sm text-muted-foreground">{lineDetail.name}</p>
-                    <p className="text-3xl font-bold text-foreground mt-1">{lineDetail.value}</p>
-                    <p className="text-xs text-muted-foreground mt-1">{lineDetail.value} volunteers in {lineDetail.name}</p>
-                  </div>
-                </motion.div>
+          </div>
+        </div>
+
+        {/* Comparison Charts */}
+        <div className="glass-card p-4 sm:p-6 space-y-4">
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <h3 className="font-semibold text-foreground">Comparison</h3>
+            <div className="flex gap-1 glass rounded-xl p-1">
+              {(["month", "year", "event"] as CompareMode[]).map((m) => (
+                <button key={m} onClick={() => setCompareMode(m)}
+                  className={cn("px-3 py-1.5 rounded-lg text-xs font-medium transition-all capitalize",
+                    compareMode === m ? "bg-violet-600 text-white" : "text-muted-foreground hover:text-foreground")}>
+                  {m === "month" ? "Month vs Month" : m === "year" ? "Year vs Year" : "Top Events"}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="h-56">
+            <ResponsiveContainer width="100%" height="100%">
+              {compareMode === "month" ? (
+                <BarChart data={monthCompareData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
+                  <XAxis dataKey="name" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} axisLine={false} tickLine={false} allowDecimals={false} />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Legend wrapperStyle={{ fontSize: "11px", color: "hsl(var(--muted-foreground))" }} />
+                  <Bar dataKey="thisYear" name={`${new Date().getFullYear()}`} fill="#8B5CF6" radius={[4,4,0,0]} />
+                  <Bar dataKey="lastYear" name={`${new Date().getFullYear()-1}`} fill="#EC4899" radius={[4,4,0,0]} />
+                </BarChart>
+              ) : compareMode === "year" ? (
+                <BarChart data={yearCompareData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
+                  <XAxis dataKey="name" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} axisLine={false} tickLine={false} allowDecimals={false} />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Bar dataKey="value" name="Events" fill="#10B981" radius={[4,4,0,0]} />
+                </BarChart>
+              ) : (
+                <BarChart data={top5Events} layout="vertical">
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" horizontal={false} />
+                  <XAxis type="number" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} axisLine={false} tickLine={false} allowDecimals={false} />
+                  <YAxis dataKey="name" type="category" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} axisLine={false} tickLine={false} width={100} />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Bar dataKey="participants" name="Participants" fill="#F59E0B" radius={[0,4,4,0]} />
+                </BarChart>
               )}
-            </AnimatePresence>
+            </ResponsiveContainer>
           </div>
         </div>
 
@@ -234,58 +306,148 @@ export default function Reports() {
         {/* Staff table */}
         {staffData.length > 0 && (
           <div className="glass-card p-4">
-            <h2 className="mb-3 text-sm font-semibold text-foreground">Staff Activity</h2>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-white/08">
-                    {["Name", "Created", "Completed"].map((h) => (
-                      <th key={h} className="py-2 px-2 text-left text-xs font-medium text-muted-foreground">{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {staffData.map((row) => (
-                    <tr key={row.name} className="border-b border-white/05 last:border-0">
-                      <td className="py-2.5 px-2 text-sm text-foreground font-medium">{row.name}</td>
-                      <td className="py-2.5 px-2 font-semibold text-foreground">{row.created}</td>
-                      <td className="py-2.5 px-2 font-semibold text-emerald-400">{row.completed}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {/* All events table */}
-        <div className="glass-card p-4">
-          <h2 className="mb-3 text-sm font-semibold text-foreground">All Events ({events.length})</h2>
-          <div className="overflow-x-auto">
+            <h2 className="mb-4 text-sm font-semibold text-foreground">Staff Activity</h2>
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-white/08">
-                  {["Title", "Category", "Status", "Start Date"].map((h) => (
-                    <th key={h} className="py-2 px-2 text-left text-xs font-medium text-muted-foreground whitespace-nowrap">{h}</th>
+                  {["Name", "Created", "Completed"].map((h) => (
+                    <th key={h} className="pb-3 px-2 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide">{h}</th>
                   ))}
                 </tr>
               </thead>
-              <tbody>
-                {events.map((e) => (
-                  <tr key={e.id} className="border-b border-white/05 last:border-0">
-                    <td className="py-2.5 px-2 font-medium text-foreground max-w-[160px] truncate">{e.title}</td>
-                    <td className="py-2.5 px-2 text-xs text-muted-foreground">{e.category || "—"}</td>
-                    <td className="py-2.5 px-2"><StatusBadge status={e.status} size="sm" /></td>
-                    <td className="py-2.5 px-2 text-xs text-muted-foreground whitespace-nowrap">
-                      {toMs(e.startDate) ? new Date(toMs(e.startDate)).toLocaleDateString() : "—"}
-                    </td>
+              <tbody className="divide-y divide-white/05">
+                {staffData.map((row) => (
+                  <tr key={row.name} className="hover:bg-white/02 transition-colors">
+                    <td className="py-3 px-2 text-sm text-foreground font-medium">{row.name}</td>
+                    <td className="py-3 px-2"><span className="inline-flex items-center rounded-full bg-violet-500/10 text-violet-400 px-2.5 py-0.5 text-xs font-semibold">{row.created}</span></td>
+                    <td className="py-3 px-2"><span className="inline-flex items-center rounded-full bg-emerald-500/10 text-emerald-400 px-2.5 py-0.5 text-xs font-semibold">{row.completed}</span></td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
+        )}
+
+        {/* All events table — click for summary */}
+        <div className="glass-card p-4">
+          <h2 className="mb-4 text-sm font-semibold text-foreground">All Events <span className="text-muted-foreground font-normal">({events.length})</span></h2>
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-white/08">
+                {["Title", "Category", "Status", "Start Date", ""].map((h, i) => (
+                  <th key={i} className="pb-3 px-2 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide whitespace-nowrap">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-white/05">
+              {events.map((e) => (
+                <tr key={e.id} className="hover:bg-white/02 transition-colors cursor-pointer" onClick={() => setSelectedEvent(e)}>
+                  <td className="py-3 px-2 font-medium text-foreground max-w-[160px] truncate">{e.title}</td>
+                  <td className="py-3 px-2">
+                    {e.category ? <span className="text-xs rounded-full bg-white/08 px-2.5 py-0.5 text-muted-foreground">{e.category}</span> : <span className="text-muted-foreground">—</span>}
+                  </td>
+                  <td className="py-3 px-2"><StatusBadge status={e.status} size="sm" /></td>
+                  <td className="py-3 px-2 text-xs text-muted-foreground whitespace-nowrap">
+                    {toMs(e.startDate) ? new Date(toMs(e.startDate)).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "—"}
+                  </td>
+                  <td className="py-3 px-2"><ChevronRight className="h-4 w-4 text-muted-foreground" /></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
+
+      {/* Event Summary Modal */}
+      <AnimatePresence>
+        {selectedEvent && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+            onClick={() => setSelectedEvent(null)}>
+            <motion.div initial={{ opacity: 0, scale: 0.92, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.92, y: 20 }} transition={{ duration: 0.2 }}
+              className="glass-card w-full max-w-lg max-h-[85vh] overflow-y-auto"
+              onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-start justify-between mb-4">
+                <div>
+                  <h2 className="text-lg font-bold text-foreground">{selectedEvent.title}</h2>
+                  <p className="text-xs text-muted-foreground mt-0.5">{selectedEvent.category || "No category"}</p>
+                </div>
+                <button onClick={() => setSelectedEvent(null)} className="p-1.5 rounded-lg hover:bg-white/10 transition-colors">
+                  <X className="h-4 w-4 text-muted-foreground" />
+                </button>
+              </div>
+
+              <div className="flex flex-wrap gap-2 mb-4">
+                <StatusBadge status={selectedEvent.status} size="sm" />
+              </div>
+
+              {/* Key metrics */}
+              <div className="grid grid-cols-3 gap-3 mb-4">
+                {[
+                  { label: "Assigned", value: selectedEvent.assignedTo?.length ?? 0, color: "#8B5CF6" },
+                  { label: "Attendees", value: selectedEvent.attendees?.length ?? 0, color: "#10B981" },
+                  { label: "Photos", value: selectedEvent.photos?.length ?? 0, color: "#F59E0B" },
+                ].map((m) => (
+                  <div key={m.label} className="glass rounded-xl p-3 text-center">
+                    <p className="text-xl font-bold" style={{ color: m.color }}>{m.value}</p>
+                    <p className="text-xs text-muted-foreground">{m.label}</p>
+                  </div>
+                ))}
+              </div>
+
+              {/* Dates */}
+              <div className="grid grid-cols-2 gap-3 mb-4 text-sm">
+                <div className="glass rounded-xl p-3">
+                  <p className="text-xs text-muted-foreground mb-1">Start</p>
+                  <p className="text-foreground font-medium">
+                    {toMs(selectedEvent.startDate) ? new Date(toMs(selectedEvent.startDate)).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—"}
+                  </p>
+                </div>
+                <div className="glass rounded-xl p-3">
+                  <p className="text-xs text-muted-foreground mb-1">End</p>
+                  <p className="text-foreground font-medium">
+                    {toMs(selectedEvent.endDate) ? new Date(toMs(selectedEvent.endDate)).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—"}
+                  </p>
+                </div>
+              </div>
+
+              {/* Description */}
+              {selectedEvent.description && (
+                <div className="mb-4">
+                  <p className="text-xs text-muted-foreground mb-1 font-medium">Description</p>
+                  <p className="text-sm text-foreground">{selectedEvent.description}</p>
+                </div>
+              )}
+
+              {/* Attendees */}
+              {selectedEvent.attendees && selectedEvent.attendees.length > 0 && (
+                <div className="mb-4">
+                  <p className="text-xs text-muted-foreground mb-2 font-medium">Attendees</p>
+                  <div className="space-y-1.5 max-h-40 overflow-y-auto">
+                    {selectedEvent.attendees.map((a) => (
+                      <div key={a.uid} className="flex items-center gap-2 py-1 px-2 rounded-lg bg-white/03 text-sm">
+                        <span className="text-foreground flex-1">{a.displayName}</span>
+                        <span className="text-xs text-muted-foreground capitalize">{a.joinType}</span>
+                        {a.committeeName && <span className="text-xs text-violet-400">{a.committeeName}</span>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Tags */}
+              {selectedEvent.tags?.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {selectedEvent.tags.map((t) => (
+                    <span key={t} className="text-xs rounded-full bg-white/08 border border-white/10 px-2.5 py-0.5 text-muted-foreground">#{t}</span>
+                  ))}
+                </div>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </Layout>
   );
 }
@@ -294,5 +456,4 @@ const demoEvents: FirestoreEvent[] = [
   { id: "d1", title: "Literacy Workshop", description: "", location: "Nagpur", startDate: Date.now() - 5*86400000, endDate: Date.now() - 4*86400000, status: "Completed", createdBy: "staff1", assignedTo: ["a","b","c"], photos: [], category: "Workshop", tags: [], createdAt: Date.now() - 10*86400000, updatedAt: Date.now() },
   { id: "d2", title: "Teacher Training", description: "", location: "Online", startDate: Date.now() + 86400000, endDate: Date.now() + 2*86400000, status: "Planned", createdBy: "staff1", assignedTo: [], photos: [], category: "Seminar", tags: [], createdAt: Date.now() - 3*86400000, updatedAt: Date.now() },
   { id: "d3", title: "Supply Drive", description: "", location: "Mumbai", startDate: Date.now() - 86400000, endDate: Date.now() + 86400000, status: "Ongoing", createdBy: "staff2", assignedTo: ["x","y"], photos: [], category: "Community Outreach", tags: [], createdAt: Date.now() - 7*86400000, updatedAt: Date.now() },
-  { id: "d4", title: "Annual Gala", description: "", location: "Pune", startDate: Date.now() - 20*86400000, endDate: Date.now() - 19*86400000, status: "Completed", createdBy: "staff2", assignedTo: ["a","b","c","d","e"], photos: [], category: "Fundraiser", tags: [], createdAt: Date.now() - 30*86400000, updatedAt: Date.now() },
 ];
