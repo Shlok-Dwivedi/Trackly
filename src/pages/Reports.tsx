@@ -253,7 +253,7 @@ export default function Reports() {
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
                 <XAxis dataKey="name" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} axisLine={false} tickLine={false} />
                 <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} axisLine={false} tickLine={false} allowDecimals={false} />
-                <Tooltip content={<CustomTooltip />} />
+                <Tooltip content={<CustomTooltip />} wrapperStyle={{ background: "transparent", border: "none", boxShadow: "none" }} cursor={{ fill: "rgba(255,255,255,0.04)" }} />
                 <Area type="monotone" dataKey="value" stroke="#8B5CF6" strokeWidth={2.5} fill="url(#volGrad)"
                   dot={{ fill: "#8B5CF6", strokeWidth: 2, r: 4 }} activeDot={{ r: 6, fill: "#8B5CF6" }} />
               </AreaChart>
@@ -349,70 +349,50 @@ export default function Reports() {
 
           <div className="h-56">
             <ResponsiveContainer width="100%" height="100%">
-              {compareMode === "month" ? (() => {
-                const getCount = (month: number, year: number) =>
-                  events.filter((e) => { const ms = toMs(e.startDate); if (!ms) return false; const d = new Date(ms); return d.getMonth() === month && d.getFullYear() === year; }).length;
-                const data = [
-                  { name: `${MONTH_LABELS[compareMonthA]} ${compareYearA}`, count: getCount(compareMonthA, compareYearA), fill: "#8B5CF6" },
-                  { name: `${MONTH_LABELS[compareMonthB]} ${compareYearB}`, count: getCount(compareMonthB, compareYearB), fill: "#EC4899" },
-                ];
-                return (
-                  <BarChart data={data}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
-                    <XAxis dataKey="name" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} axisLine={false} tickLine={false} />
-                    <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} axisLine={false} tickLine={false} allowDecimals={false} />
-                    <Tooltip content={<CustomTooltip />} />
-                    <Bar dataKey="count" name="Events" radius={[4,4,0,0]}>
-                      {data.map((entry, i) => <rect key={i} fill={entry.fill} />)}
-                    </Bar>
-                  </BarChart>
-                );
-              })() : compareMode === "year" ? (() => {
-                const metrics = (year: number) => {
-                  const yr = events.filter((e) => { const ms = toMs(e.startDate); return ms && new Date(ms).getFullYear() === year; });
-                  return { events: yr.length, completed: yr.filter((e) => e.status === "Completed").length, participants: new Set([...yr.flatMap((e) => e.assignedTo || []), ...yr.flatMap((e) => (e.attendees || []).map((a) => a.uid))]).size };
-                };
-                const mA = metrics(compareYearA); const mB = metrics(compareYearB);
-                const data = [
-                  { metric: "Events", [compareYearA]: mA.events, [compareYearB]: mB.events },
-                  { metric: "Completed", [compareYearA]: mA.completed, [compareYearB]: mB.completed },
-                  { metric: "Participants", [compareYearA]: mA.participants, [compareYearB]: mB.participants },
-                ];
-                return (
-                  <BarChart data={data}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
-                    <XAxis dataKey="metric" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} axisLine={false} tickLine={false} />
-                    <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} axisLine={false} tickLine={false} allowDecimals={false} />
-                    <Tooltip content={<CustomTooltip />} />
-                    <Legend wrapperStyle={{ fontSize: "11px" }} />
-                    <Bar dataKey={compareYearA} name={String(compareYearA)} fill="#10B981" radius={[4,4,0,0]} />
-                    <Bar dataKey={compareYearB} name={String(compareYearB)} fill="#F59E0B" radius={[4,4,0,0]} />
-                  </BarChart>
-                );
-              })() : (() => {
-                const eA = events.find((e) => e.id === compareEventA);
-                const eB = events.find((e) => e.id === compareEventB);
-                if (!eA && !eB) return <BarChart data={[]}><XAxis /><YAxis /></BarChart>;
-                const metric = (e?: FirestoreEvent) => e ? [
-                  { metric: "Assigned", value: e.assignedTo?.length ?? 0 },
-                  { metric: "Attendees", value: e.attendees?.length ?? 0 },
-                  { metric: "Photos", value: e.photos?.length ?? 0 },
-                ] : [];
-                const mA = metric(eA); const mB = metric(eB);
-                const data = ["Assigned","Attendees","Photos"].map((m) => ({
-                  metric: m,
-                  [eA?.title?.slice(0,15) || "Event A"]: mA.find((x) => x.metric === m)?.value ?? 0,
-                  [eB?.title?.slice(0,15) || "Event B"]: mB.find((x) => x.metric === m)?.value ?? 0,
+              {(() => {
+                // Shared metric builder — same 4 metrics for all 3 modes
+                const metrics = (evList: FirestoreEvent[], label: string, color: string) => ({
+                  label, color,
+                  "Events Done": evList.filter((e) => e.status === "Completed").length,
+                  "Total Events": evList.length,
+                  "Participants": new Set([...evList.flatMap((e) => e.assignedTo || []), ...evList.flatMap((e) => (e.attendees || []).map((a: {uid:string}) => a.uid))]).size,
+                  "Photos": evList.reduce((acc, e) => acc + (e.photos?.length ?? 0), 0),
+                });
+
+                let mA: ReturnType<typeof metrics>;
+                let mB: ReturnType<typeof metrics>;
+
+                if (compareMode === "month") {
+                  const filterM = (m: number, y: number) => events.filter((e) => { const ms = toMs(e.startDate); if (!ms) return false; const d = new Date(ms); return d.getMonth() === m && d.getFullYear() === y; });
+                  mA = metrics(filterM(compareMonthA, compareYearA), `${MONTH_LABELS[compareMonthA]} ${compareYearA}`, "#8B5CF6");
+                  mB = metrics(filterM(compareMonthB, compareYearB), `${MONTH_LABELS[compareMonthB]} ${compareYearB}`, "#EC4899");
+                } else if (compareMode === "year") {
+                  const filterY = (y: number) => events.filter((e) => { const ms = toMs(e.startDate); return ms && new Date(ms).getFullYear() === y; });
+                  mA = metrics(filterY(compareYearA), String(compareYearA), "#10B981");
+                  mB = metrics(filterY(compareYearB), String(compareYearB), "#F59E0B");
+                } else {
+                  const eA = events.find((e) => e.id === compareEventA);
+                  const eB = events.find((e) => e.id === compareEventB);
+                  mA = metrics(eA ? [eA] : [], eA?.title?.slice(0, 18) || "Event A", "#8B5CF6");
+                  mB = metrics(eB ? [eB] : [], eB?.title?.slice(0, 18) || "Event B", "#EC4899");
+                }
+
+                const METRIC_KEYS = ["Events Done", "Total Events", "Participants", "Photos"] as const;
+                const data = METRIC_KEYS.map((k) => ({
+                  metric: k,
+                  [mA.label]: mA[k],
+                  [mB.label]: mB[k],
                 }));
+
                 return (
                   <BarChart data={data}>
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
                     <XAxis dataKey="metric" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} axisLine={false} tickLine={false} />
                     <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} axisLine={false} tickLine={false} allowDecimals={false} />
-                    <Tooltip content={<CustomTooltip />} />
-                    <Legend wrapperStyle={{ fontSize: "11px" }} />
-                    {eA && <Bar dataKey={eA.title.slice(0,15)} fill="#8B5CF6" radius={[4,4,0,0]} />}
-                    {eB && <Bar dataKey={eB.title.slice(0,15)} fill="#EC4899" radius={[4,4,0,0]} />}
+                    <Tooltip content={<CustomTooltip />} wrapperStyle={{ background: "transparent", border: "none", boxShadow: "none" }} cursor={{ fill: "rgba(255,255,255,0.04)" }} />
+                    <Legend wrapperStyle={{ fontSize: "11px", color: "hsl(var(--muted-foreground))" }} />
+                    <Bar dataKey={mA.label} fill={mA.color} radius={[4,4,0,0]} />
+                    <Bar dataKey={mB.label} fill={mB.color} radius={[4,4,0,0]} />
                   </BarChart>
                 );
               })()}
