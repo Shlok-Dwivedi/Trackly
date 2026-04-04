@@ -12,6 +12,7 @@ import {
   limit,
   getDocs,
   orderBy,
+  writeBatch,
 } from "firebase/firestore";
 import { updateProfile } from "firebase/auth";
 import {
@@ -312,6 +313,28 @@ export default function Profile() {
       );
       setEditing(false);
       toast.success("Profile updated");
+
+      // Sync displayName in all events where this user is an attendee
+      const newName = displayName.trim() || userDoc?.displayName || "";
+      if (newName) {
+        try {
+          const eventsSnap = await getDocs(
+            query(collection(db, "events"), where("assignedTo", "array-contains", uid))
+          );
+          const batch = writeBatch(db);
+          eventsSnap.docs.forEach((eventDoc) => {
+            const data = eventDoc.data();
+            const attendees: Attendee[] = data.attendees || [];
+            const updated = attendees.map((a: Attendee) =>
+              a.uid === uid ? { ...a, displayName: newName } : a
+            );
+            if (JSON.stringify(updated) !== JSON.stringify(attendees)) {
+              batch.update(eventDoc.ref, { attendees: updated });
+            }
+          });
+          await batch.commit();
+        } catch {}
+      }
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Failed to save profile");
     } finally {

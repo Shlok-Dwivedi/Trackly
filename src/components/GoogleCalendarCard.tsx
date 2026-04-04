@@ -1,8 +1,11 @@
 import { useState, useEffect } from 'react';
+import { toast } from 'sonner';
 import { 
   connectGoogleCalendar, 
   disconnectGoogleCalendar, 
   isGoogleCalendarConnected,
+  hasEverConnectedGoogleCalendar,
+  trySilentReauth,
   getLastSyncTime,
   getGoogleCalendarToken,
   createGoogleCalendarEvent,
@@ -19,10 +22,33 @@ export default function GoogleCalendarCard({ onConnect, onDisconnect }: GoogleCa
   const [connected, setConnected] = useState(false);
   const [lastSync, setLastSync] = useState<Date | null>(null);
   const [exporting, setExporting] = useState(false);
+  const everConnected = hasEverConnectedGoogleCalendar();
 
   useEffect(() => {
-    setConnected(isGoogleCalendarConnected());
+    const isConn = isGoogleCalendarConnected();
+    setConnected(isConn);
     setLastSync(getLastSyncTime());
+
+    // If previously connected but token expired, try silent re-auth
+    if (!isConn && hasEverConnectedGoogleCalendar()) {
+      trySilentReauth().then((success) => {
+        if (success) setConnected(true);
+      });
+    }
+
+    // Schedule auto-reconnect 5 minutes before token expires
+    const expiry = localStorage.getItem('google_calendar_token_expiry');
+    if (expiry) {
+      const msUntilRefresh = parseInt(expiry) - Date.now() - 5 * 60 * 1000;
+      if (msUntilRefresh > 0) {
+        const timer = setTimeout(() => {
+          trySilentReauth().then((success) => {
+            if (success) setConnected(true);
+          });
+        }, msUntilRefresh);
+        return () => clearTimeout(timer);
+      }
+    }
   }, []);
 
   const handleConnect = () => {
@@ -87,9 +113,6 @@ export default function GoogleCalendarCard({ onConnect, onDisconnect }: GoogleCa
     }
   };
 
-  const handleSyncSettings = () => {
-    alert('Sync Settings coming soon! Currently all non-cancelled events are synced automatically.');
-  };
 
   const formatLastSync = (date: Date) => {
     const now = new Date();
@@ -123,7 +146,7 @@ export default function GoogleCalendarCard({ onConnect, onDisconnect }: GoogleCa
             <div className="text-xs mt-0.5" style={{ color: COLORS.textMuted }}>
               {connected 
                 ? "✅ Connected — events sync automatically" 
-                : "Connect to sync Trackly events to your Google Calendar"}
+                : everConnected ? "Session expired — reconnect to resume syncing" : "Connect to sync Trackly events to your Google Calendar"}
             </div>
           </div>
         </div>
@@ -152,7 +175,7 @@ export default function GoogleCalendarCard({ onConnect, onDisconnect }: GoogleCa
             }}
           >
             <span>🔗</span>
-            Connect
+            {everConnected ? "Reconnect" : "Connect"}
           </button>
         )}
       </div>
@@ -174,17 +197,6 @@ export default function GoogleCalendarCard({ onConnect, onDisconnect }: GoogleCa
             }}
           >
             {exporting ? '⏳ Exporting...' : '↗ Export All Events'}
-          </button>
-          <button
-            onClick={handleSyncSettings}
-            className="px-2.5 py-1 rounded-lg text-[11px] font-medium transition-colors"
-            style={{
-              backgroundColor: COLORS.greyLight,
-              color: COLORS.textMuted,
-              border: 'none',
-            }}
-          >
-            ⚙️ Sync Settings
           </button>
           <div 
             className="ml-auto flex items-center gap-1 text-[11px]"

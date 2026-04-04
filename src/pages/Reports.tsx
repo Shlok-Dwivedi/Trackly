@@ -33,18 +33,22 @@ function toMs(val: unknown): number {
 }
 
 function buildVolunteerData(events: FirestoreEvent[]) {
-  const map: Record<number, number> = {};
+  // Map of month → Set of unique user IDs
+  const map: Record<number, Set<string>> = {};
   events.forEach((e) => {
     const ms = toMs(e.startDate);
     if (!ms) return;
     const m = new Date(ms).getMonth();
-    const count = (e.assignedTo?.length || 0) + (e.attendees?.length || 0) + 1;
-    map[m] = (map[m] || 0) + count;
+    if (!map[m]) map[m] = new Set();
+    // Add assigned users
+    (e.assignedTo || []).forEach((uid: string) => map[m].add(uid));
+    // Add attendees — Set deduplicates automatically
+    (e.attendees || []).forEach((a: { uid: string }) => map[m].add(a.uid));
   });
   // Last 6 months rolling window
   const currentMonth = new Date().getMonth();
   const last6 = Array.from({ length: 6 }, (_, i) => (currentMonth - 5 + i + 12) % 12);
-  return last6.map((i) => ({ name: MONTH_LABELS[i], value: map[i] ?? 0 }));
+  return last6.map((i) => ({ name: MONTH_LABELS[i], value: map[i]?.size ?? 0 }));
 }
 
 export default function Reports() {

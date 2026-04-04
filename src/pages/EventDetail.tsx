@@ -28,6 +28,7 @@ import {
 } from "@/lib/googleCalendar";
 import { toDate } from "@/lib/utils";
 import { getCategoryColor } from "@/lib/constants";
+import { writeActivityLog } from "@/lib/activityLog";
 
 const FLASK_BASE = import.meta.env.VITE_FLASK_API_URL || "";
 
@@ -71,21 +72,20 @@ export default function EventDetail() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [cancelling, setCancelling] = useState(false);
+  const [repositionPhoto, setRepositionPhoto] = useState<EventPhoto | null>(null);
+  const [position, setPosition] = useState({ x: 50, y: 50 });
+  const [zoom, setZoom] = useState(1);
 
   useEffect(() => {
     if (!id) { setLoading(false); return; }
     const unsub = onSnapshot(doc(db, "events", id), (snap) => {
       if (!snap.exists()) { setEvent(null); setLoading(false); return; }
       const data = { id: snap.id, ...snap.data() } as FirestoreEvent;
-      // Auto-complete: if endDate has passed and status is still Planned/Ongoing, mark Completed
       const now = Date.now();
       const endMs = typeof data.endDate === "number" ? data.endDate : 0;
       if (endMs > 0 && endMs < now &&
           (data.status?.toLowerCase() === "planned" || data.status?.toLowerCase() === "ongoing")) {
-        updateDoc(doc(db, "events", id), {
-          status: "Completed",
-          updatedAt: serverTimestamp(),
-        }).catch(() => {});
+        updateDoc(doc(db, "events", id), { status: "Completed", updatedAt: serverTimestamp() }).catch(() => {});
         data.status = "Completed";
       }
       setEvent(data);
@@ -100,10 +100,7 @@ export default function EventDetail() {
       try {
         const q = query(collection(db, "events", id!, "joinRequests"), where("uid", "==", user!.uid));
         const snap = await getDocs(q);
-        if (!snap.empty) {
-          const d = snap.docs[0].data();
-          setUserJoinRequest(d as JoinRequest);
-        }
+        if (!snap.empty) setUserJoinRequest(snap.docs[0].data() as JoinRequest);
       } catch {}
     }
     checkJoinRequest();
@@ -133,9 +130,7 @@ export default function EventDetail() {
       toast.success("Photo deleted");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Failed to delete photo");
-    } finally {
-      setDeletingPhotoUrl(null);
-    }
+    } finally { setDeletingPhotoUrl(null); }
   }
 
   async function handleDeleteEvent() {
@@ -151,10 +146,7 @@ export default function EventDetail() {
       navigate("/events");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Failed to delete event");
-    } finally {
-      setDeletingEvent(false);
-      setShowDeleteModal(false);
-    }
+    } finally { setDeletingEvent(false); setShowDeleteModal(false); }
   }
 
   async function handleCancelEvent() {
@@ -165,7 +157,9 @@ export default function EventDetail() {
         status: "Cancelled", updatedAt: serverTimestamp(),
         statusHistory: arrayUnion({ status: "Cancelled", changedBy: user.uid, changedAt: Date.now(), note: "Cancelled by admin" }),
       });
-      await writeActivityLog("event_cancelled", user.uid, user.displayName || "Admin", "event", id, event.title, {});
+      await writeActivityLog("event_cancelled", user.uid, user.displayName || "Admin", "event", id, event.title, {
+        newValue: event.startDate,
+      });
       toast.success("Event cancelled");
       setShowCancelModal(false);
     } catch (e) { toast.error(e instanceof Error ? e.message : "Failed"); }
@@ -193,8 +187,7 @@ export default function EventDetail() {
       }
       return;
     }
-    setExporting(true);
-    setExportMsg(null);
+    setExporting(true); setExportMsg(null);
     try {
       const result = await createGoogleCalendarEvent({
         title: event.title, description: event.description || "",
@@ -212,6 +205,33 @@ export default function EventDetail() {
     } finally { setExporting(false); }
   }
 
+  async function handleSetCover(photo: EventPhoto) {
+    if (!id || !event) return;
+    try {
+      // Parse existing position if available
+      const existingPos = event.coverPosition?.split(" ");
+      const initX = existingPos ? parseInt(existingPos[0]) : 50;
+      const initY = existingPos ? parseInt(existingPos[1]) : 50;
+      await updateDoc(doc(db, "events", id), { coverPhotoUrl: photo.url, coverPosition: `${initX}% ${initY}%`, coverZoom: event.coverZoom || 1, updatedAt: serverTimestamp() });
+      setEvent((prev) => prev ? { ...prev, coverPhotoUrl: photo.url } : prev);
+      setPosition({ x: initX, y: initY });
+      setZoom(event.coverZoom || 1);
+      setRepositionPhoto(photo);
+      toast.success("Cover photo set — drag to reposition");
+    } catch { toast.error("Failed to set cover photo"); }
+  }
+
+  async function handleSavePosition() {
+    if (!id || !repositionPhoto) return;
+    const pos = `${Math.round(position.x)}% ${Math.round(position.y)}%`;
+    try {
+      await updateDoc(doc(db, "events", id), { coverPosition: pos, coverZoom: zoom, updatedAt: serverTimestamp() });
+      setEvent((prev) => prev ? { ...prev, coverPosition: pos, coverZoom: zoom } : prev);
+      setRepositionPhoto(null);
+      toast.success("Position saved");
+    } catch { toast.error("Failed to save position"); }
+  }
+
   async function handleJoinEvent() {
     if (!id || !user || !event) return;
     setRequesting(true);
@@ -222,6 +242,16 @@ export default function EventDetail() {
       };
       await updateDoc(doc(db, "events", id), { attendees: arrayUnion(newAttendee), updatedAt: serverTimestamp() });
       setEvent((prev) => prev ? { ...prev, attendees: [...(prev.attendees ?? []), newAttendee] } : prev);
+      // Notify the user they've enrolled
+      await addDoc(collection(db, "notifications"), {
+        userId: user.uid,
+        title: "Enrolled successfully",
+        body: `You're now registered for "${event.title}"`,
+        eventId: id,
+        read: false,
+        createdAt: serverTimestamp(),
+        type: "enrollment",
+      }).catch(() => {});
       toast.success("You've joined this event!");
     } catch (err) { toast.error(err instanceof Error ? err.message : "Failed to join"); }
     finally { setRequesting(false); }
@@ -242,9 +272,7 @@ export default function EventDetail() {
 
   if (loading) return (
     <Layout title="Event" showBack>
-      <div className="flex justify-center py-24">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
+      <div className="flex justify-center py-24"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
     </Layout>
   );
 
@@ -258,7 +286,9 @@ export default function EventDetail() {
   );
 
   const accentColor = getCategoryColor(event.category || "");
-  const heroPhoto = event.photos?.[0];
+  const heroPhoto = event.coverPhotoUrl
+    ? { url: event.coverPhotoUrl }
+    : event.photos?.[0];
 
   return (
     <Layout title={event.title} showBack>
@@ -270,30 +300,25 @@ export default function EventDetail() {
 
         {/* Hero header */}
         <div
-          className="relative h-48 md:h-64 flex items-end overflow-hidden"
-          style={{
-            background: heroPhoto ? undefined
-              : `linear-gradient(135deg, ${accentColor}30 0%, ${accentColor}10 50%, rgba(139,92,246,0.15) 100%)`,
-          }}
+          className="relative h-48 md:h-64 flex items-center justify-center overflow-hidden rounded-2xl"
+          style={{ background: heroPhoto ? undefined : `${accentColor}18` }}
         >
-          {heroPhoto && (
-            <img src={heroPhoto.url} alt={event.title} className="absolute inset-0 w-full h-full object-cover" />
-          )}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
-          <div className="relative z-10 p-5 w-full">
-            <div className="flex flex-wrap gap-2 mb-2">
-              <StatusBadge status={event.status} />
-              {event.category && (
-                <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium text-white"
-                  style={{ backgroundColor: `${accentColor}90` }}>
-                  {event.category}
-                </span>
-              )}
+          {heroPhoto ? (
+            <img src={heroPhoto.url} alt={event.title} className="absolute inset-0 w-full h-full object-cover"
+              style={{
+                objectPosition: event.coverPosition || "center",
+                transform: `scale(${event.coverZoom || 1})`,
+                transformOrigin: event.coverPosition || "center",
+              }} />
+          ) : (
+            <div className="flex flex-col items-center gap-2 opacity-40">
+              <div className="flex h-16 w-16 items-center justify-center rounded-2xl" style={{ backgroundColor: `${accentColor}30` }}>
+                <span className="text-3xl">📅</span>
+              </div>
+              <p className="text-xs text-foreground/50">No cover photo</p>
             </div>
-            <h1 className="text-xl md:text-2xl font-extrabold text-white leading-tight line-clamp-2">
-              {event.title}
-            </h1>
-          </div>
+          )}
+          {/* No dark overlay — title/badges moved below the hero */}
           {/* Action buttons top-right */}
           <div className="absolute top-4 right-4 flex gap-2 z-10">
             {role === "admin" && (
@@ -323,6 +348,22 @@ export default function EventDetail() {
               </Link>
             )}
           </div>
+        </div>
+
+        {/* Title + badges below hero */}
+        <div className="px-1 pt-4 pb-1">
+          <div className="flex flex-wrap gap-2 mb-2">
+            <StatusBadge status={event.status} />
+            {event.category && (
+              <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium text-white"
+                style={{ backgroundColor: `${accentColor}90` }}>
+                {event.category}
+              </span>
+            )}
+          </div>
+          <h1 className="text-xl md:text-2xl font-extrabold text-foreground leading-tight line-clamp-2">
+            {event.title}
+          </h1>
         </div>
 
         {/* Content */}
@@ -397,7 +438,6 @@ export default function EventDetail() {
                 </span>
               )}
             </div>
-
             {user && (role === "volunteer" || role === "staff") && (
               <div className="pt-2 border-t border-white/08">
                 {isAttending ? (
@@ -430,9 +470,7 @@ export default function EventDetail() {
           {/* Attendees */}
           {event.attendees && event.attendees.length > 0 && (
             <div className="glass-card">
-              <h3 className="text-sm font-semibold text-foreground mb-3">
-                Attendees ({event.attendees.length})
-              </h3>
+              <h3 className="text-sm font-semibold text-foreground mb-3">Attendees ({event.attendees.length})</h3>
               <div className="flex flex-wrap gap-2">
                 {event.attendees.map((a) => (
                   <div key={a.uid} className="flex items-center gap-2 rounded-xl bg-white/05 px-3 py-1.5">
@@ -482,9 +520,7 @@ export default function EventDetail() {
 
           {/* Photos */}
           <div>
-            <h2 className="mb-3 text-sm font-semibold text-foreground">
-              Photos ({event.photos?.length ?? 0})
-            </h2>
+            <h2 className="mb-3 text-sm font-semibold text-foreground">Photos ({event.photos?.length ?? 0})</h2>
             {event.photos?.length > 0 && (
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 mb-4">
                 {event.photos.map((photo, i) => {
@@ -501,22 +537,31 @@ export default function EventDetail() {
                           {photo.uploadedByName}
                         </p>
                       )}
-                      {/* Action buttons: always visible on mobile, hover-reveal on desktop */}
                       <div className="absolute top-2 right-2 flex gap-1 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
-                        <button
-                          type="button"
+                        {(role === "admin" || role === "staff") && (
+                          <button type="button"
+                            onClick={(e) => { e.stopPropagation(); handleSetCover(photo); }}
+                            className={cn(
+                              "p-1.5 rounded-lg text-white text-[10px] font-bold transition-colors",
+                              event.coverPhotoUrl === photo.url
+                                ? "bg-violet-600"
+                                : "bg-black/60 hover:bg-violet-600"
+                            )}
+                            title="Set as cover"
+                          >
+                            ★
+                          </button>
+                        )}
+                        <button type="button"
                           onClick={(e) => { e.stopPropagation(); downloadPhoto(photo.url, `${event.title}-photo-${i + 1}.jpg`); }}
-                          className="p-1.5 rounded-lg bg-black/60 text-white hover:bg-black/80 transition-colors"
-                          title="Download"
-                        >
+                          className="p-1.5 rounded-lg bg-black/60 text-white hover:bg-black/80 transition-colors" title="Download">
                           <Download className="h-3.5 w-3.5" />
                         </button>
                         {canDeletePhoto && (
                           <button type="button"
                             onClick={(e) => { e.stopPropagation(); if (confirm("Delete this photo?")) handleDeletePhoto(photo); }}
                             disabled={deletingPhotoUrl === photo.url}
-                            className="p-1.5 rounded-lg bg-red-600 text-white hover:bg-red-500 transition-colors disabled:opacity-50"
-                            title="Delete">
+                            className="p-1.5 rounded-lg bg-red-600 text-white hover:bg-red-500 transition-colors disabled:opacity-50" title="Delete">
                             {deletingPhotoUrl === photo.url ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
                           </button>
                         )}
@@ -535,8 +580,7 @@ export default function EventDetail() {
             )}
           </div>
         </div>
-
-        </div> {/* end main column */}
+        </div>
 
         {/* Activity sidebar */}
         <div className="lg:sticky lg:top-24">
@@ -546,9 +590,8 @@ export default function EventDetail() {
           </div>
         </div>
 
-        </div> {/* end grid */}
-
-      </div> {/* end animate-fade-in */}
+        </div>
+      </div>
 
       {/* Lightbox */}
       <Dialog open={!!lightboxPhoto} onOpenChange={() => setLightboxPhoto(null)}>
@@ -561,21 +604,15 @@ export default function EventDetail() {
                   {lightboxPhoto.uploadedByName} · {toIST(lightboxPhoto.timestamp).toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata" })}
                 </p>
                 <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => downloadPhoto(lightboxPhoto.url, `${event.title}-photo.jpg`)}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-xs font-medium transition-colors"
-                  >
-                    <Download className="h-3.5 w-3.5" />
-                    Download
+                  <button onClick={() => downloadPhoto(lightboxPhoto.url, `${event.title}-photo.jpg`)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-xs font-medium transition-colors">
+                    <Download className="h-3.5 w-3.5" /> Download
                   </button>
                   {(role === "admin" || lightboxPhoto.uploadedBy === user?.uid) && (
-                    <button
-                      onClick={() => { handleDeletePhoto(lightboxPhoto); setLightboxPhoto(null); }}
+                    <button onClick={() => { handleDeletePhoto(lightboxPhoto); setLightboxPhoto(null); }}
                       disabled={deletingPhotoUrl === lightboxPhoto.url}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 text-white text-xs font-medium transition-colors disabled:opacity-50"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                      Delete
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 text-white text-xs font-medium transition-colors disabled:opacity-50">
+                      <Trash2 className="h-3.5 w-3.5" /> Delete
                     </button>
                   )}
                 </div>
@@ -628,6 +665,115 @@ export default function EventDetail() {
             <button onClick={handleCancelEvent} disabled={cancelling}
               className="flex-1 rounded-xl bg-red-600 py-2 text-sm font-semibold text-white hover:bg-red-500 disabled:opacity-60 transition-all">
               {cancelling ? "Cancelling…" : "Cancel Event"}
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reposition Modal */}
+      <Dialog open={!!repositionPhoto} onOpenChange={() => setRepositionPhoto(null)}>
+        <DialogContent className="glass-card max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="text-foreground">Reposition Cover Photo</DialogTitle>
+            <DialogDescription>Drag the image to pan. The center crosshair shows the focal point.</DialogDescription>
+          </DialogHeader>
+          {repositionPhoto && (
+            <div className="space-y-4">
+              <div
+                className="relative w-full overflow-hidden rounded-xl cursor-grab active:cursor-grabbing select-none"
+                style={{ aspectRatio: "4/3" }}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  const startX = e.clientX;
+                  const startY = e.clientY;
+                  const startPos = { ...position };
+                  const el = e.currentTarget as HTMLElement;
+                  const onMove = (me: MouseEvent) => {
+                    const rect = el.getBoundingClientRect();
+                    // sensitivity: less movement needed at higher zoom
+                    const sensitivity = 1 / zoom;
+                    const dx = ((me.clientX - startX) / rect.width) * 100 * sensitivity;
+                    const dy = ((me.clientY - startY) / rect.height) * 100 * sensitivity;
+                    setPosition({
+                      x: Math.max(0, Math.min(100, startPos.x - dx)),
+                      y: Math.max(0, Math.min(100, startPos.y - dy)),
+                    });
+                  };
+                  const onUp = () => {
+                    window.removeEventListener("mousemove", onMove);
+                    window.removeEventListener("mouseup", onUp);
+                  };
+                  window.addEventListener("mousemove", onMove);
+                  window.addEventListener("mouseup", onUp);
+                }}
+                onTouchStart={(e) => {
+                  const touch = e.touches[0];
+                  const startX = touch.clientX;
+                  const startY = touch.clientY;
+                  const startPos = { ...position };
+                  const el = e.currentTarget as HTMLElement;
+                  const onMove = (te: TouchEvent) => {
+                    const t = te.touches[0];
+                    const rect = el.getBoundingClientRect();
+                    const sensitivity = 1 / zoom;
+                    const dx = ((t.clientX - startX) / rect.width) * 100 * sensitivity;
+                    const dy = ((t.clientY - startY) / rect.height) * 100 * sensitivity;
+                    setPosition({
+                      x: Math.max(0, Math.min(100, startPos.x - dx)),
+                      y: Math.max(0, Math.min(100, startPos.y - dy)),
+                    });
+                  };
+                  const onEnd = () => {
+                    window.removeEventListener("touchmove", onMove);
+                    window.removeEventListener("touchend", onEnd);
+                  };
+                  window.addEventListener("touchmove", onMove);
+                  window.addEventListener("touchend", onEnd);
+                }}
+              >
+                <img
+                  src={repositionPhoto.url} alt=""
+                  className="w-full h-full object-cover pointer-events-none"
+                  style={{
+                    objectPosition: `${position.x}% ${position.y}%`,
+                    transform: `scale(${zoom})`,
+                    transformOrigin: `${position.x}% ${position.y}%`,
+                  }}
+                  draggable={false}
+                />
+                {/* Fixed crosshair at center */}
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                  <div className="relative w-8 h-8">
+                    <div className="absolute inset-0 rounded-full border-2 border-white shadow-lg" />
+                    <div className="absolute left-1/2 top-0 bottom-0 w-px bg-white/70 -translate-x-1/2" />
+                    <div className="absolute top-1/2 left-0 right-0 h-px bg-white/70 -translate-y-1/2" />
+                  </div>
+                </div>
+                <div className="absolute inset-0 border-2 border-dashed border-white/20 rounded-xl pointer-events-none" />
+              </div>
+              <p className="text-xs text-center text-muted-foreground">
+                Drag to pan · focal point: {Math.round(position.x)}%, {Math.round(position.y)}%
+              </p>
+              <div className="flex items-center gap-3">
+                <span className="text-xs text-muted-foreground w-8">Zoom</span>
+                <input
+                  type="range" min="1" max="3" step="0.05"
+                  value={zoom}
+                  onChange={(e) => setZoom(parseFloat(e.target.value))}
+                  className="flex-1 accent-violet-500"
+                />
+                <span className="text-xs text-muted-foreground w-10 text-right">{zoom.toFixed(1)}×</span>
+              </div>
+            </div>
+          )}
+          <DialogFooter className="gap-2">
+            <button onClick={() => setRepositionPhoto(null)}
+              className="flex-1 rounded-xl glass border border-white/10 py-2 text-sm font-medium text-foreground">
+              Cancel
+            </button>
+            <button onClick={handleSavePosition}
+              className="flex-1 rounded-xl bg-violet-600 py-2 text-sm font-semibold text-white hover:bg-violet-500 transition-all">
+              Save Position
             </button>
           </DialogFooter>
         </DialogContent>

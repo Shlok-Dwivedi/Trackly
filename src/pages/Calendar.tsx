@@ -2,7 +2,7 @@ import { useEffect, useState, useMemo, useCallback } from "react";
 import React from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Calendar as BigCalendar, dateFnsLocalizer, SlotInfo } from "react-big-calendar";
-import { format, parse, startOfWeek, getDay, toDate } from "date-fns";
+import { format, parse, startOfWeek, getDay, toDate, isToday } from "date-fns";
 import { enUS } from "date-fns/locale";
 import { collection, query, onSnapshot, orderBy } from "firebase/firestore";
 import { List, Grid3X3, Clock, Loader2 } from "lucide-react";
@@ -127,6 +127,18 @@ export default function CalendarPage() {
     return map;
   }, [events]);
 
+  // Per-day: total count and completed count
+  const dayStats = useMemo(() => {
+    const map: Record<string, { total: number; completed: number }> = {};
+    events.forEach((e) => {
+      const key = format(new Date(e.startDate), "yyyy-MM-dd");
+      if (!map[key]) map[key] = { total: 0, completed: 0 };
+      map[key].total++;
+      if (e.status === "Completed") map[key].completed++;
+    });
+    return map;
+  }, [events]);
+
   const handleSelectEvent = useCallback((event: CalendarEvent) => {
     navigate(`/events/${event.resource.eventId}`);
   }, [navigate]);
@@ -143,13 +155,16 @@ export default function CalendarPage() {
 
   const eventStyleGetter = useCallback((event: CalendarEvent) => {
     const bg = categoryColors[event.resource.category] || getCategoryColor(event.resource.category);
+    const isOngoing = event.resource.status?.toLowerCase() === "ongoing";
     return {
       style: {
         backgroundColor: bg,
         borderRadius: "6px",
         opacity: 0.9,
         color: getTextColor(bg),
-        border: "none",
+        border: isOngoing ? `3px solid #000` : "none",
+        outline: isOngoing ? `2px solid ${bg}` : "none",
+        outlineOffset: "1px",
         fontSize: "12px",
         padding: "2px 6px",
       },
@@ -204,10 +219,10 @@ export default function CalendarPage() {
         .rbc-row { display: flex; flex-direction: row; }
         .rbc-row-segment { padding: 0 1px 1px 1px; }
         .rbc-selected-cell { background-color: rgba(139,92,246,0.15); }
-        .rbc-show-more { z-index: 4; font-weight: bold; font-size: 85%; height: auto; line-height: normal; color: #8B5CF6; cursor: pointer; }
+        .rbc-show-more { display: none !important; }
         .rbc-month-view { position: relative; border: 1px solid rgba(255,255,255,0.08); display: flex; flex-direction: column; flex: 1 0 0; width: 100%; user-select: none; border-radius: 12px; overflow: hidden; }
         .rbc-month-header { display: flex; flex-direction: row; }
-        .rbc-month-row { display: flex; position: relative; flex-direction: column; flex: 1 0 0; flex-basis: 0px; overflow: hidden; height: 100%; border-top: 1px solid rgba(255,255,255,0.06); }
+        .rbc-month-row { display: flex; position: relative; flex-direction: column; flex: 1 0 0; flex-basis: 0px; overflow: hidden; height: 100%; min-height: 80px; border-top: 1px solid rgba(255,255,255,0.06); }
         .rbc-month-row + .rbc-month-row { border-top: 1px solid rgba(255,255,255,0.06); }
         .rbc-date-cell { flex: 1 1 0; min-width: 0; padding: 4px 6px; text-align: right; font-size: 12px; color: hsl(var(--muted-foreground)); }
         .rbc-date-cell.rbc-now { font-weight: bold; }
@@ -353,7 +368,7 @@ export default function CalendarPage() {
             eventPropGetter={eventStyleGetter}
             style={{ height: "calc(100vh - 260px)", minHeight: 480 }}
             views={["month", "week", "agenda"]}
-            popup
+            doShowMoreDrillDown={false}
             showMultiDayTimes
             components={{
               agenda: {
@@ -362,16 +377,25 @@ export default function CalendarPage() {
               toolbar: () => null,
               month: {
                 dateHeader: ({ date }: { date: Date }) => {
-                  const count = eventsByDate[format(date, "yyyy-MM-dd")] || 0;
+                  const key = format(date, "yyyy-MM-dd");
+                  const stats = dayStats[key];
+                  const allDone = stats && stats.total > 0 && stats.completed === stats.total;
+                  const remaining = stats ? stats.total - stats.completed : 0;
                   return (
                     <div className="relative w-full h-full flex items-center justify-center">
-                      <span className="text-sm">{format(date, "d")}</span>
-                      {count > 0 && (
+                      {allDone ? (
+                        <span className="flex items-center justify-center w-6 h-6 rounded-full bg-emerald-500 text-white text-xs font-bold">✓</span>
+                      ) : (
+                        <span className={`text-sm ${isToday(date) ? "text-violet-400 font-bold" : ""}`}>
+                          {format(date, "d")}
+                        </span>
+                      )}
+                      {remaining > 0 && (
                         <span
                           className="absolute -top-1 -right-1 flex items-center justify-center rounded-full bg-violet-600 text-[9px] text-white font-bold"
                           style={{ width: "14px", height: "14px" }}
                         >
-                          {count > 9 ? "9+" : count}
+                          {remaining > 9 ? "9+" : remaining}
                         </span>
                       )}
                     </div>

@@ -3,10 +3,11 @@ import { Link } from "react-router-dom";
 import {
   collection, getDocs, query, orderBy,
   doc, setDoc, deleteDoc, updateDoc, onSnapshot,
+  writeBatch, arrayRemove,
 } from "firebase/firestore";
 import {
   Loader2, UserCheck, AlertCircle, Shield, ExternalLink,
-  Plus, Trash2, Users as UsersIcon, Building2, ChevronDown, ChevronUp, X, Tag,
+  Plus, Trash2, Users as UsersIcon, Building2, ChevronDown, ChevronUp, X, Tag, UserMinus,
 } from "lucide-react";
 import { db, auth } from "@/lib/firebase";
 import { FirestoreUser, UserRole } from "@/types";
@@ -241,6 +242,65 @@ export default function Users() {
     }
   }
 
+  async function kickUser(u: FirestoreUser) {
+    if (!window.confirm(`Kick ${u.displayName || u.email}? This will remove them from all events and departments. Their uploaded photos will remain. They can sign up again.`)) return;
+    try {
+      const batch = writeBatch(db);
+
+      // 1. Delete user doc from Firestore
+      batch.delete(doc(db, "users", u.uid));
+
+      // 2. Remove from all departments
+      departments.forEach((dept) => {
+        if (dept.memberUids.includes(u.uid)) {
+          batch.update(doc(db, "departments", dept.id), {
+            memberUids: arrayRemove(u.uid),
+          });
+        }
+      });
+
+      await batch.commit();
+
+      // 3. Remove from all events (assignedTo + attendees) — batch separately
+      const eventsSnap = await getDocs(collection(db, "events"));
+      const eventBatch = writeBatch(db);
+      let eventChanges = 0;
+      eventsSnap.docs.forEach((eventDoc) => {
+        const data = eventDoc.data();
+        const assignedTo: string[] = data.assignedTo || [];
+        const attendees: { uid: string }[] = data.attendees || [];
+        const inAssigned = assignedTo.includes(u.uid);
+        const inAttendees = attendees.some((a) => a.uid === u.uid);
+        if (inAssigned || inAttendees) {
+          const updates: Record<string, unknown> = {};
+          if (inAssigned) updates.assignedTo = arrayRemove(u.uid);
+          if (inAttendees) updates.attendees = attendees.filter((a) => a.uid !== u.uid);
+          eventBatch.update(eventDoc.ref, updates);
+          eventChanges++;
+        }
+      });
+      if (eventChanges > 0) await eventBatch.commit();
+
+      // 4. Delete Firebase Auth account via backend
+      if (FLASK_BASE && auth.currentUser) {
+        const idToken = await auth.currentUser.getIdToken(true);
+        await fetch(`${FLASK_BASE}/api/auth/delete-user`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${idToken}`,
+          },
+          body: JSON.stringify({ uid: u.uid }),
+        }).catch(() => {});
+      }
+
+      setUsers((prev) => prev.filter((x) => x.uid !== u.uid));
+      toast.success(`${u.displayName || u.email} has been kicked.`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to kick user.");
+    }
+  }
+
   if (loading) return (
     <Layout title="Users">
       <div className="flex justify-center py-24">
@@ -270,11 +330,12 @@ export default function Users() {
           </div>
 
           {/* Desktop header */}
-          <div className="hidden md:grid grid-cols-[1fr_200px_180px_100px] gap-3 px-5 py-3 border-b border-white/06 text-xs font-semibold text-muted-foreground uppercase tracking-wide bg-white/02">
+          <div className="hidden md:grid grid-cols-[1fr_200px_180px_100px_80px] gap-3 px-5 py-3 border-b border-white/06 text-xs font-semibold text-muted-foreground uppercase tracking-wide bg-white/02">
             <span>User</span>
             <span>Email</span>
             <span>Assign Role</span>
             <span>Current</span>
+            <span>Kick</span>
           </div>
 
           <ul className="divide-y divide-white/05">
@@ -300,10 +361,16 @@ export default function Users() {
                   </div>
                   <RoleSelector uid={u.uid} currentRole={u.role} assigning={assigning} onAssign={assignRole} />
                   {feedback[u.uid] && <FeedbackMsg msg={feedback[u.uid]} />}
+                  <button
+                    onClick={() => kickUser(u)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-500/10 text-red-400 text-xs font-medium hover:bg-red-500/20 transition-colors border border-red-500/20 w-fit"
+                  >
+                    <UserMinus className="h-3.5 w-3.5" /> Kick
+                  </button>
                 </div>
 
                 {/* Desktop */}
-                <div className="hidden md:grid grid-cols-[1fr_200px_180px_100px] gap-3 items-center">
+                <div className="hidden md:grid grid-cols-[1fr_200px_180px_100px_80px] gap-3 items-center">
                   <div className="flex items-center gap-3">
                     {u.photoURL ? (
                       <img src={u.photoURL} alt="" className="h-8 w-8 rounded-full object-cover ring-2 ring-violet-500/20" />
@@ -327,6 +394,13 @@ export default function Users() {
                   <span className={cn("inline-block rounded-full px-2.5 py-0.5 text-xs font-medium capitalize text-center", u.role ? roleColors[u.role] : "bg-white/08 text-muted-foreground")}>
                     {u.role ?? "—"}
                   </span>
+                  <button
+                    onClick={() => kickUser(u)}
+                    className="flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg bg-red-500/10 text-red-400 text-xs font-medium hover:bg-red-500/20 transition-colors border border-red-500/20"
+                    title="Kick user"
+                  >
+                    <UserMinus className="h-3.5 w-3.5" />
+                  </button>
                 </div>
               </li>
             ))}

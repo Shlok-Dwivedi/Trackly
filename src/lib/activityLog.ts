@@ -1,4 +1,4 @@
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { collection, addDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
 export type ActivityAction =
@@ -39,6 +39,6 @@ export async function writeActivityLog(
     targetId,
     targetTitle,
     details: details || {},
-    createdAt: serverTimestamp(),
+    createdAt: Date.now(),
   });
 }

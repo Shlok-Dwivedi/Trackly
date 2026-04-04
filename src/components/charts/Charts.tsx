@@ -119,10 +119,10 @@ function ActiveShape(props: ActiveShapeProps) {
         startAngle={startAngle} endAngle={endAngle} fill={fill} opacity={0.18}
         style={{ filter: "blur(8px)" }} />
       <Sector cx={cx} cy={cy} innerRadius={innerRadius - 2} outerRadius={outerRadius + 8}
-        startAngle={startAngle} endAngle={endAngle} fill={fill} stroke="rgba(255,255,255,0.1)" strokeWidth={2} />
-      <text x={cx} y={cy - 8} textAnchor="middle" fill="white" fontSize={16} fontWeight={700}>{value}</text>
-      <text x={cx} y={cy + 12} textAnchor="middle" fill="rgba(255,255,255,0.6)" fontSize={11}>{payload.name}</text>
-      <text x={cx} y={cy + 28} textAnchor="middle" fill="rgba(255,255,255,0.5)" fontSize={10}>{`${(percent * 100).toFixed(0)}%`}</text>
+        startAngle={startAngle} endAngle={endAngle} fill={fill} stroke="hsl(var(--background))" strokeWidth={2} />
+      <text x={cx} y={cy - 8} textAnchor="middle" fill="hsl(var(--foreground))" fontSize={16} fontWeight={700}>{value}</text>
+      <text x={cx} y={cy + 12} textAnchor="middle" fill="hsl(var(--muted-foreground))" fontSize={11}>{payload.name}</text>
+      <text x={cx} y={cy + 28} textAnchor="middle" fill="hsl(var(--muted-foreground))" fontSize={10}>{`${(percent * 100).toFixed(0)}%`}</text>
     </g>
   );
 }

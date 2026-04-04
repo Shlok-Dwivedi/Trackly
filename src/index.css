@@ -111,7 +111,7 @@
 .dark {
   --background: 0 0% 0%;
   --foreground: 250 25% 92%;
-  --card: 0 0% 5%;
+  --card: 0 0% 2%;
   --card-foreground: 250 25% 92%;
   --popover: 0 0% 5%;
   --popover-foreground: 250 25% 92%;
@@ -137,9 +137,9 @@
   --sidebar-border: 0 0% 10%;
   --sidebar-ring: 262 83% 72%;
 
-  --glass-bg: rgba(0, 0, 0, 0.75);
-  --glass-bg-strong: rgba(0, 0, 0, 0.88);
-  --glass-bg-subtle: rgba(0, 0, 0, 0.50);
+  --glass-bg: rgba(5, 5, 5, 0.98);
+  --glass-bg-strong: rgba(3, 3, 3, 1);
+  --glass-bg-subtle: rgba(8, 8, 8, 0.96);
   --glass-border: rgba(255, 255, 255, 0.06);
   --glass-shadow: 0 4px 20px -4px rgba(0, 0, 0, 0.4);
   --glass-shadow-elevated: 0 8px 30px -4px rgba(0, 0, 0, 0.5);

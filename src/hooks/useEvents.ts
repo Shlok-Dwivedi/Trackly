@@ -11,21 +11,9 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { FirestoreEvent, EventStatus } from "@/types";
-
-/**
- * Safely convert any date value from Firestore to a JS Date.
- * Handles: plain ms number, Firestore Timestamp object, ISO string.
- */
-function toDate(value: unknown): Date | null {
-  if (!value) return null;
-  // Firestore Timestamp object
-  if (typeof value === "object" && "seconds" in (value as object)) {
-    return new Date((value as { seconds: number }).seconds * 1000);
-  }
-  // Plain number (ms) or ISO string
-  const d = new Date(value as number | string);
-  return isNaN(d.getTime()) ? null : d;
-}
+import { nowInIST } from "@/lib/utils";
+import { writeActivityLog } from "@/lib/activityLog";
+import { collection, addDoc } from "firebase/firestore";
 
 /**
  * Auto-update event status based on event dates.
@@ -33,18 +21,18 @@ function toDate(value: unknown): Date | null {
  * Skips events with "Cancelled" status.
  */
 async function autoUpdateEventStatus(event: FirestoreEvent): Promise<void> {
-  const now = new Date();
-
+  // Use IST for comparisons
+  const now = nowInIST();
+  console.log('NOW (IST):', now.toString());
+  
   if (!event.startDate || !event.endDate) return;
   if (event.status === "Cancelled") return;
 
-  const start = toDate(event.startDate);
-  const end = toDate(event.endDate);
-
-  if (!start || !end) {
-    console.warn(`Invalid dates for event ${event.id}`, event.startDate, event.endDate);
-    return;
-  }
+  // Convert timestamps to Date objects for comparison
+  const start = new Date(event.startDate);
+  const end = new Date(event.endDate);
+  console.log('START:', start.toString());
+  console.log('END:', end.toString());
 
   let suggestedStatus: EventStatus;
   if (now < start) {
@@ -54,6 +42,8 @@ async function autoUpdateEventStatus(event: FirestoreEvent): Promise<void> {
   } else {
     suggestedStatus = "Completed";
   }
+
+  console.log(`Checking event: ${event.title} | status: "${event.status}" | suggested: "${suggestedStatus}"`);
 
   if (suggestedStatus !== event.status) {
     try {
@@ -67,6 +57,27 @@ async function autoUpdateEventStatus(event: FirestoreEvent): Promise<void> {
           note: "Auto-updated based on event dates"
         })
       });
+      await writeActivityLog("status_changed", "system", "System", "event", event.id, event.title || "Untitled", {
+        previousValue: event.status,
+        newValue: suggestedStatus,
+      });
+      // Notify assigned users when event goes Ongoing or Completed
+      if (suggestedStatus === "Ongoing" || suggestedStatus === "Completed") {
+        const assignedTo: string[] = (event as { assignedTo?: string[] }).assignedTo || [];
+        const msg = suggestedStatus === "Ongoing"
+          ? `"${event.title}" has started!`
+          : `"${event.title}" has been marked as completed.`;
+        for (const uid of assignedTo) {
+          addDoc(collection(db, "notifications"), {
+            userId: uid,
+            title: suggestedStatus === "Ongoing" ? "Event started" : "Event completed",
+            body: msg,
+            eventId: event.id,
+            read: false,
+            createdAt: Timestamp.now(),
+          }).catch(() => {});
+        }
+      }
     } catch (err) {
       console.error("Failed to auto-update event status:", err);
     }
@@ -81,20 +92,33 @@ export function useEvents() {
     const q = query(collection(db, "events"), orderBy("startDate", "desc"));
     
     const unsubscribe = onSnapshot(q, (snapshot) => {
+      // Log all Firestore status values to debug
+      snapshot.docs.forEach(doc => {
+        const data = doc.data()
+        console.log(`[Firestore] id:${doc.id} status:"${data.status}" type:${typeof data.status}`)
+      })
+      
       const loadedEvents = snapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
       })) as FirestoreEvent[];
 
+      // Run auto-update on EVERY event in the snapshot
+      // Wrap in try/catch to prevent crashes from individual event failures
       loadedEvents.forEach((event) => {
-        autoUpdateEventStatus(event).catch((err) =>
-          console.error("Auto-update failed:", event.id, err)
-        );
+        try {
+          autoUpdateEventStatus(event).catch((err) =>
+            console.error("Auto-update failed:", event.id, err)
+          );
+        } catch (err) {
+          console.error("Auto-update failed:", event.id, err);
+        }
       });
 
       setEvents(loadedEvents);
       setLoading(false);
     }, (error) => {
+      // If Firebase fails, still set loading to false
       console.log("Firebase not available:", error);
       setLoading(false);
     });

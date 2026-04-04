@@ -8,6 +8,7 @@ import { FirestoreUser, EnrollmentType, Attendee } from "@/types";
 import Layout from "@/components/layout/Layout";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { writeActivityLog } from "@/lib/activityLog";
 
 const ENROLLMENT_OPTIONS: { value: EnrollmentType; label: string }[] = [
   { value: "assigned", label: "Assigned Only" },
@@ -22,7 +23,7 @@ interface FormState {
 }
 
 const inputClass =
-  "w-full rounded-xl border border-white/10 bg-white/05 px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-violet-500/40 focus:border-violet-500/40 transition-all";
+  "w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-violet-500/40 focus:border-violet-500/40 transition-all";
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -122,6 +123,20 @@ export default function EventCreate() {
         updatedAt: serverTimestamp(),
       });
       toast.success("Event created!");
+      await writeActivityLog("event_created", user.uid, user.displayName || "User", "event", docRef.id, form.title.trim(), {
+        newValue: new Date(form.startDate).getTime(),
+      });
+      // Notify all assigned users
+      for (const uid of form.assignedTo) {
+        await addDoc(collection(db, "notifications"), {
+          userId: uid,
+          title: "You've been assigned to an event",
+          body: `You have been assigned to "${form.title.trim()}"`,
+          eventId: docRef.id,
+          read: false,
+          createdAt: serverTimestamp(),
+        }).catch(() => {});
+      }
       navigate(`/events/${docRef.id}`);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to create event";

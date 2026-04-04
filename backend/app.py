@@ -4,7 +4,6 @@ from flask import Flask, Response, jsonify, request
 from flask_cors import CORS
 from dotenv import load_dotenv
 
-# Load .env in local dev; Render injects env vars in production
 load_dotenv()
 
 FRONTEND_ORIGIN = os.getenv("FRONTEND_ORIGIN", "http://localhost:5173")
@@ -32,7 +31,6 @@ def create_app() -> Flask:
         methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     )
 
-    # Explicit OPTIONS preflight handler — runs before any route
     @app.before_request
     def handle_preflight():
         if request.method == "OPTIONS":
@@ -49,7 +47,6 @@ def create_app() -> Flask:
             resp.status_code = 204
             return resp
 
-    # Register blueprints
     from routes.auth import auth_bp
     from routes.calendar import calendar_bp
     from routes.notifications import notifications_bp
@@ -69,10 +66,24 @@ def create_app() -> Flask:
             resp.headers["Access-Control-Allow-Credentials"] = "true"
         return resp, 200
 
+    @app.route("/ping-supabase", methods=["GET"])
+    def ping_supabase():
+        import urllib.request
+        supabase_url = os.getenv("SUPABASE_URL")
+        supabase_key = os.getenv("SUPABASE_ANON_KEY")
+        try:
+            req = urllib.request.Request(
+                f"{supabase_url}/rest/v1/",
+                headers={"apikey": supabase_key}
+            )
+            urllib.request.urlopen(req, timeout=5)
+            return jsonify({"status": "supabase ok"}), 200
+        except Exception as e:
+            return jsonify({"status": "supabase error", "error": str(e)}), 200
+
     return app
 
 
-# Gunicorn entry point (production)
 application = create_app()
 
 if __name__ == "__main__":

@@ -52,6 +52,7 @@ export function handleGoogleCallback(): string | null {
   
   if (token) {
     localStorage.setItem('google_calendar_token', token)
+    localStorage.setItem('google_calendar_ever_connected', '1')
     // Save expiry
     const expiresIn = params.get('expires_in')
     const expiry = Date.now() + (parseInt(expiresIn || '3600') * 1000)
@@ -80,8 +81,63 @@ export function disconnectGoogleCalendar() {
 }
 
 /**
- * Get stored Google Calendar access token
+ * Check if user has ever connected Google Calendar
  */
+export function hasEverConnectedGoogleCalendar(): boolean {
+  return !!localStorage.getItem('google_calendar_ever_connected');
+}
+
+/**
+ * Try silent re-authentication using an iframe (prompt=none)
+ * Returns true if a new token was obtained
+ */
+export function trySilentReauth(): Promise<boolean> {
+  return new Promise((resolve) => {
+    if (!GOOGLE_CLIENT_ID) { resolve(false); return; }
+
+    const params = new URLSearchParams({
+      client_id: GOOGLE_CLIENT_ID,
+      redirect_uri: REDIRECT_URI,
+      response_type: 'token',
+      scope: SCOPES,
+      prompt: 'none', // silent — no UI shown
+    });
+
+    const iframe = document.createElement('iframe');
+    iframe.style.display = 'none';
+    iframe.src = `https://accounts.google.com/o/oauth2/v2/auth?${params}`;
+    document.body.appendChild(iframe);
+
+    const timer = setTimeout(() => {
+      document.body.removeChild(iframe);
+      resolve(false);
+    }, 5000);
+
+    iframe.onload = () => {
+      try {
+        const hash = iframe.contentWindow?.location.hash;
+        if (hash) {
+          const p = new URLSearchParams(hash.substring(1));
+          const token = p.get('access_token');
+          if (token) {
+            localStorage.setItem('google_calendar_token', token);
+            localStorage.setItem('google_calendar_ever_connected', '1');
+            const expiresIn = p.get('expires_in');
+            const expiry = Date.now() + (parseInt(expiresIn || '3600') * 1000);
+            localStorage.setItem('google_calendar_token_expiry', expiry.toString());
+            clearTimeout(timer);
+            document.body.removeChild(iframe);
+            resolve(true);
+            return;
+          }
+        }
+      } catch {}
+      clearTimeout(timer);
+      document.body.removeChild(iframe);
+      resolve(false);
+    };
+  });
+}
 export function getGoogleCalendarToken(): string | null {
   if (!isGoogleCalendarConnected()) return null
   return localStorage.getItem('google_calendar_token')
@@ -208,4 +264,3 @@ export async function deleteGoogleCalendarEvent(googleEventId: string) {
     }
   )
 }
-

@@ -334,9 +334,11 @@ export default function Dashboard() {
               </div>
               {(role === "admin" || role === "staff") && (
                 <Link to="/events/create"
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-white text-sm font-medium shadow-lg shadow-violet-500/40 hover:shadow-xl hover:shadow-violet-500/50 transition-all hover:scale-105"
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-white text-sm font-medium shadow-lg shadow-violet-500/40 hover:shadow-violet-500/50 transition-all hover:scale-105 active:scale-95 relative overflow-hidden group"
                   style={{ background: "#8B5CF6" }}>
-                  <Plus className="h-4 w-4" />
+                  {/* Shimmer sweep */}
+                  <span className="absolute inset-0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700 bg-gradient-to-r from-transparent via-white/20 to-transparent pointer-events-none" />
+                  <Plus className="h-4 w-4 transition-transform duration-300 group-hover:rotate-90" />
                   New Event
                 </Link>
               )}
@@ -441,7 +443,7 @@ export default function Dashboard() {
           <motion.div className="glass-card !rounded-2xl !p-6"
             initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.6 }}>
             <h3 className="text-lg font-semibold text-foreground mb-4">Recent Activity</h3>
-            <ActivityFeed maxItems={5} compact filterActions={["event_created", "event_updated", "event_cancelled", "event_reactivated", "status_changed", "user_role_changed"]}/>
+            <ActivityFeed maxItems={5} compact filterActions={["event_created", "status_changed", "event_cancelled"]} />
           </motion.div>
 
           <motion.div className="glass-card !rounded-2xl !p-6"

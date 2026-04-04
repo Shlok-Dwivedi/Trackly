@@ -37,6 +37,18 @@ export default function Login() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email.trim())) {
+      setError("Please enter a valid email address.");
+      return;
+    }
+    if (isSignup && password.length < 6) {
+      setError("Password must be at least 6 characters.");
+      return;
+    }
+
     setSubmitting(true);
     try {
       if (isSignup) await signupWithEmail(email, password, displayName);
@@ -95,7 +107,7 @@ export default function Login() {
             style={{ background: "linear-gradient(90deg, #a78bfa, #ec4899)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
             Trackly
           </h1>
-          <p className="mt-2 text-sm text-slate-500 max-w-xs">Empowering NGOs, One Event at a Time</p>
+          <p className="mt-2 text-sm text-slate-500 max-w-xs"></p>
         </motion.div>
       </div>
 
