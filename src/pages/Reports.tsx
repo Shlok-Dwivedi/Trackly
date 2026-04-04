@@ -59,6 +59,14 @@ export default function Reports() {
   const [userNames, setUserNames] = useState<Record<string, string>>({});
   const [selectedEvent, setSelectedEvent] = useState<FirestoreEvent | null>(null);
   const [compareMode, setCompareMode] = useState<CompareMode>("month");
+  // Month comparison selectors
+  const [compareMonthA, setCompareMonthA] = useState(new Date().getMonth());
+  const [compareMonthB, setCompareMonthB] = useState((new Date().getMonth() - 1 + 12) % 12);
+  const [compareYearA, setCompareYearA] = useState(new Date().getFullYear());
+  const [compareYearB, setCompareYearB] = useState(new Date().getFullYear() - 1);
+  // Event comparison selectors
+  const [compareEventA, setCompareEventA] = useState<string>("");
+  const [compareEventB, setCompareEventB] = useState<string>("");
 
   useEffect(() => {
     async function load() {
@@ -260,43 +268,154 @@ export default function Reports() {
             <div className="flex gap-1 glass rounded-xl p-1">
               {(["month", "year", "event"] as CompareMode[]).map((m) => (
                 <button key={m} onClick={() => setCompareMode(m)}
-                  className={cn("px-3 py-1.5 rounded-lg text-xs font-medium transition-all capitalize",
+                  className={cn("px-3 py-1.5 rounded-lg text-xs font-medium transition-all",
                     compareMode === m ? "bg-violet-600 text-white" : "text-muted-foreground hover:text-foreground")}>
-                  {m === "month" ? "Month vs Month" : m === "year" ? "Year vs Year" : "Top Events"}
+                  {m === "month" ? "Month vs Month" : m === "year" ? "Year vs Year" : "Event vs Event"}
                 </button>
               ))}
             </div>
           </div>
 
+          {/* Selectors */}
+          {compareMode === "month" && (
+            <div className="flex flex-wrap gap-3 items-center text-sm">
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground w-1 h-4 rounded-full bg-violet-500 inline-block" />
+                <select value={compareMonthA} onChange={(e) => setCompareMonthA(Number(e.target.value))}
+                  className="rounded-lg border border-white/10 bg-background text-xs text-foreground px-2 py-1 focus:outline-none">
+                  {MONTH_LABELS.map((m, i) => <option key={i} value={i}>{m}</option>)}
+                </select>
+                <select value={compareYearA} onChange={(e) => setCompareYearA(Number(e.target.value))}
+                  className="rounded-lg border border-white/10 bg-background text-xs text-foreground px-2 py-1 focus:outline-none">
+                  {Array.from(new Set(events.map((e) => toMs(e.startDate) ? new Date(toMs(e.startDate)).getFullYear() : 0).filter(Boolean))).sort((a,b)=>b-a).map((y) => <option key={y} value={y}>{y}</option>)}
+                </select>
+              </div>
+              <span className="text-xs text-muted-foreground">vs</span>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground w-1 h-4 rounded-full bg-pink-500 inline-block" />
+                <select value={compareMonthB} onChange={(e) => setCompareMonthB(Number(e.target.value))}
+                  className="rounded-lg border border-white/10 bg-background text-xs text-foreground px-2 py-1 focus:outline-none">
+                  {MONTH_LABELS.map((m, i) => <option key={i} value={i}>{m}</option>)}
+                </select>
+                <select value={compareYearB} onChange={(e) => setCompareYearB(Number(e.target.value))}
+                  className="rounded-lg border border-white/10 bg-background text-xs text-foreground px-2 py-1 focus:outline-none">
+                  {Array.from(new Set(events.map((e) => toMs(e.startDate) ? new Date(toMs(e.startDate)).getFullYear() : 0).filter(Boolean))).sort((a,b)=>b-a).map((y) => <option key={y} value={y}>{y}</option>)}
+                </select>
+              </div>
+            </div>
+          )}
+
+          {compareMode === "year" && (
+            <div className="flex flex-wrap gap-3 items-center">
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground w-1 h-4 rounded-full bg-emerald-500 inline-block" />
+                <select value={compareYearA} onChange={(e) => setCompareYearA(Number(e.target.value))}
+                  className="rounded-lg border border-white/10 bg-background text-xs text-foreground px-2 py-1 focus:outline-none">
+                  {Array.from(new Set(events.map((e) => toMs(e.startDate) ? new Date(toMs(e.startDate)).getFullYear() : 0).filter(Boolean))).sort((a,b)=>b-a).map((y) => <option key={y} value={y}>{y}</option>)}
+                </select>
+              </div>
+              <span className="text-xs text-muted-foreground">vs</span>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground w-1 h-4 rounded-full bg-amber-500 inline-block" />
+                <select value={compareYearB} onChange={(e) => setCompareYearB(Number(e.target.value))}
+                  className="rounded-lg border border-white/10 bg-background text-xs text-foreground px-2 py-1 focus:outline-none">
+                  {Array.from(new Set(events.map((e) => toMs(e.startDate) ? new Date(toMs(e.startDate)).getFullYear() : 0).filter(Boolean))).sort((a,b)=>b-a).map((y) => <option key={y} value={y}>{y}</option>)}
+                </select>
+              </div>
+            </div>
+          )}
+
+          {compareMode === "event" && (
+            <div className="flex flex-wrap gap-3 items-center">
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground w-1 h-4 rounded-full bg-violet-500 inline-block" />
+                <select value={compareEventA} onChange={(e) => setCompareEventA(e.target.value)}
+                  className="rounded-lg border border-white/10 bg-background text-xs text-foreground px-2 py-1 focus:outline-none max-w-[180px]">
+                  <option value="">Select event A</option>
+                  {events.map((e) => <option key={e.id} value={e.id}>{e.title.slice(0,30)}</option>)}
+                </select>
+              </div>
+              <span className="text-xs text-muted-foreground">vs</span>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground w-1 h-4 rounded-full bg-pink-500 inline-block" />
+                <select value={compareEventB} onChange={(e) => setCompareEventB(e.target.value)}
+                  className="rounded-lg border border-white/10 bg-background text-xs text-foreground px-2 py-1 focus:outline-none max-w-[180px]">
+                  <option value="">Select event B</option>
+                  {events.map((e) => <option key={e.id} value={e.id}>{e.title.slice(0,30)}</option>)}
+                </select>
+              </div>
+            </div>
+          )}
+
           <div className="h-56">
             <ResponsiveContainer width="100%" height="100%">
-              {compareMode === "month" ? (
-                <BarChart data={monthCompareData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
-                  <XAxis dataKey="name" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} axisLine={false} tickLine={false} allowDecimals={false} />
-                  <Tooltip content={<CustomTooltip />} />
-                  <Legend wrapperStyle={{ fontSize: "11px", color: "hsl(var(--muted-foreground))" }} />
-                  <Bar dataKey="thisYear" name={`${new Date().getFullYear()}`} fill="#8B5CF6" radius={[4,4,0,0]} />
-                  <Bar dataKey="lastYear" name={`${new Date().getFullYear()-1}`} fill="#EC4899" radius={[4,4,0,0]} />
-                </BarChart>
-              ) : compareMode === "year" ? (
-                <BarChart data={yearCompareData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
-                  <XAxis dataKey="name" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} axisLine={false} tickLine={false} allowDecimals={false} />
-                  <Tooltip content={<CustomTooltip />} />
-                  <Bar dataKey="value" name="Events" fill="#10B981" radius={[4,4,0,0]} />
-                </BarChart>
-              ) : (
-                <BarChart data={top5Events} layout="vertical">
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" horizontal={false} />
-                  <XAxis type="number" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} axisLine={false} tickLine={false} allowDecimals={false} />
-                  <YAxis dataKey="name" type="category" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} axisLine={false} tickLine={false} width={100} />
-                  <Tooltip content={<CustomTooltip />} />
-                  <Bar dataKey="participants" name="Participants" fill="#F59E0B" radius={[0,4,4,0]} />
-                </BarChart>
-              )}
+              {compareMode === "month" ? (() => {
+                const getCount = (month: number, year: number) =>
+                  events.filter((e) => { const ms = toMs(e.startDate); if (!ms) return false; const d = new Date(ms); return d.getMonth() === month && d.getFullYear() === year; }).length;
+                const data = [
+                  { name: `${MONTH_LABELS[compareMonthA]} ${compareYearA}`, count: getCount(compareMonthA, compareYearA), fill: "#8B5CF6" },
+                  { name: `${MONTH_LABELS[compareMonthB]} ${compareYearB}`, count: getCount(compareMonthB, compareYearB), fill: "#EC4899" },
+                ];
+                return (
+                  <BarChart data={data}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
+                    <XAxis dataKey="name" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} axisLine={false} tickLine={false} allowDecimals={false} />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Bar dataKey="count" name="Events" radius={[4,4,0,0]}>
+                      {data.map((entry, i) => <rect key={i} fill={entry.fill} />)}
+                    </Bar>
+                  </BarChart>
+                );
+              })() : compareMode === "year" ? (() => {
+                const metrics = (year: number) => {
+                  const yr = events.filter((e) => { const ms = toMs(e.startDate); return ms && new Date(ms).getFullYear() === year; });
+                  return { events: yr.length, completed: yr.filter((e) => e.status === "Completed").length, participants: new Set([...yr.flatMap((e) => e.assignedTo || []), ...yr.flatMap((e) => (e.attendees || []).map((a) => a.uid))]).size };
+                };
+                const mA = metrics(compareYearA); const mB = metrics(compareYearB);
+                const data = [
+                  { metric: "Events", [compareYearA]: mA.events, [compareYearB]: mB.events },
+                  { metric: "Completed", [compareYearA]: mA.completed, [compareYearB]: mB.completed },
+                  { metric: "Participants", [compareYearA]: mA.participants, [compareYearB]: mB.participants },
+                ];
+                return (
+                  <BarChart data={data}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
+                    <XAxis dataKey="metric" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} axisLine={false} tickLine={false} allowDecimals={false} />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Legend wrapperStyle={{ fontSize: "11px" }} />
+                    <Bar dataKey={compareYearA} name={String(compareYearA)} fill="#10B981" radius={[4,4,0,0]} />
+                    <Bar dataKey={compareYearB} name={String(compareYearB)} fill="#F59E0B" radius={[4,4,0,0]} />
+                  </BarChart>
+                );
+              })() : (() => {
+                const eA = events.find((e) => e.id === compareEventA);
+                const eB = events.find((e) => e.id === compareEventB);
+                if (!eA && !eB) return <BarChart data={[]}><XAxis /><YAxis /></BarChart>;
+                const metric = (e?: FirestoreEvent) => e ? [
+                  { metric: "Assigned", value: e.assignedTo?.length ?? 0 },
+                  { metric: "Attendees", value: e.attendees?.length ?? 0 },
+                  { metric: "Photos", value: e.photos?.length ?? 0 },
+                ] : [];
+                const mA = metric(eA); const mB = metric(eB);
+                const data = ["Assigned","Attendees","Photos"].map((m) => ({
+                  metric: m,
+                  [eA?.title?.slice(0,15) || "Event A"]: mA.find((x) => x.metric === m)?.value ?? 0,
+                  [eB?.title?.slice(0,15) || "Event B"]: mB.find((x) => x.metric === m)?.value ?? 0,
+                }));
+                return (
+                  <BarChart data={data}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
+                    <XAxis dataKey="metric" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} axisLine={false} tickLine={false} allowDecimals={false} />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Legend wrapperStyle={{ fontSize: "11px" }} />
+                    {eA && <Bar dataKey={eA.title.slice(0,15)} fill="#8B5CF6" radius={[4,4,0,0]} />}
+                    {eB && <Bar dataKey={eB.title.slice(0,15)} fill="#EC4899" radius={[4,4,0,0]} />}
+                  </BarChart>
+                );
+              })()}
             </ResponsiveContainer>
           </div>
         </div>
