@@ -356,6 +356,8 @@ export default function Reports() {
                   "Events Done": evList.filter((e) => e.status === "Completed").length,
                   "Total Events": evList.length,
                   "Participants": new Set([...evList.flatMap((e) => e.assignedTo || []), ...evList.flatMap((e) => (e.attendees || []).map((a: {uid:string}) => a.uid))]).size,
+                  "Assigned": evList.reduce((acc, e) => acc + (e.assignedTo?.length ?? 0), 0),
+                  "Attendees": evList.reduce((acc, e) => acc + (e.attendees?.length ?? 0), 0),
                   "Photos": evList.reduce((acc, e) => acc + (e.photos?.length ?? 0), 0),
                 });
 
@@ -378,8 +380,10 @@ export default function Reports() {
                 }
 
                 const METRIC_KEYS = (compareMode === "event"
-                  ? ["Total Events", "Participants", "Photos"]
-                  : ["Events Done", "Total Events", "Participants", "Photos"]) as readonly string[];
+                  ? ["Assigned", "Attendees", "Photos"]
+                  : compareMode === "year"
+                  ? ["Total Events", "Events Done", "Participants", "Photos"]
+                  : ["Total Events", "Events Done", "Participants", "Photos"]) as readonly string[];
                 const data = METRIC_KEYS.map((k) => ({
                   metric: k,
                   [mA.label]: mA[k],
