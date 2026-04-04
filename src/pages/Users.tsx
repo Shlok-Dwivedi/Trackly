@@ -10,7 +10,7 @@ import {
   Plus, Trash2, Users as UsersIcon, Building2, ChevronDown, ChevronUp, X, Tag, UserMinus,
 } from "lucide-react";
 import { db, auth } from "@/lib/firebase";
-import { FirestoreUser, UserRole } from "@/types";
+import { FirestoreUser, UserRole, Committee } from "@/types";
 import Layout from "@/components/layout/Layout";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -60,6 +60,15 @@ export default function Users() {
   const [catLoading, setCatLoading] = useState(true);
   const [newCatName, setNewCatName] = useState("");
   const [newCatColor, setNewCatColor] = useState("#8b5cf6");
+
+  // Committee state
+  const [committees, setCommittees] = useState<{ id: string; name: string; description?: string; color: string; leadUid?: string; memberUids: string[]; createdAt: number }[]>([]);
+  const [committeeLoading, setCommitteeLoading] = useState(true);
+  const [expandedCommittee, setExpandedCommittee] = useState<string | null>(null);
+  const [editingCommittee, setEditingCommittee] = useState<string | null>(null);
+  const [newCommittee, setNewCommittee] = useState({ name: "", description: "", color: "#8b5cf6", leadUid: "" });
+  const [creatingCommittee, setCreatingCommittee] = useState(false);
+  const [addingCommitteeMember, setAddingCommitteeMember] = useState<string | null>(null);
   const [creatingCat, setCreatingCat] = useState(false);
 
   // Ping backend on mount so Render wakes up before admin tries role changes
@@ -107,6 +116,75 @@ export default function Users() {
     );
     return unsub;
   }, []);
+
+  useEffect(() => {
+    const unsub = onSnapshot(
+      query(collection(db, "committees"), orderBy("createdAt", "asc")),
+      (snap) => {
+        setCommittees(snap.docs.map((d) => ({ id: d.id, ...d.data() } as any)));
+        setCommitteeLoading(false);
+      },
+      () => setCommitteeLoading(false)
+    );
+    return unsub;
+  }, []);
+
+  // ── Committee CRUD ────────────────────────────────────────────────────────
+  async function createCommittee() {
+    const name = newCommittee.name.trim();
+    if (!name) return;
+    if (committees.some((c) => c.name.toLowerCase() === name.toLowerCase())) {
+      toast.error("A committee with that name already exists.");
+      return;
+    }
+    setCreatingCommittee(true);
+    try {
+      const ref = doc(collection(db, "committees"));
+      await setDoc(ref, {
+        name,
+        description: newCommittee.description.trim() || null,
+        color: newCommittee.color,
+        leadUid: newCommittee.leadUid || null,
+        memberUids: [],
+        createdAt: Date.now(),
+      });
+      setNewCommittee({ name: "", description: "", color: "#8b5cf6", leadUid: "" });
+      toast.success(`Committee "${name}" created.`);
+    } catch { toast.error("Failed to create committee."); }
+    finally { setCreatingCommittee(false); }
+  }
+
+  async function deleteCommittee(c: Committee) {
+    if (!window.confirm(`Delete committee "${c.name}"?`)) return;
+    try {
+      await deleteDoc(doc(db, "committees", c.id));
+      toast.success(`Committee "${c.name}" deleted.`);
+    } catch { toast.error("Failed to delete committee."); }
+  }
+
+  async function updateCommittee(c: Committee, updates: Partial<Committee>) {
+    try {
+      await updateDoc(doc(db, "committees", c.id), updates);
+      toast.success("Committee updated.");
+      setEditingCommittee(null);
+    } catch { toast.error("Failed to update committee."); }
+  }
+
+  async function addCommitteeMember(c: Committee, uid: string) {
+    if (c.memberUids.includes(uid)) return;
+    try {
+      await updateDoc(doc(db, "committees", c.id), { memberUids: [...c.memberUids, uid] });
+      toast.success("Member added.");
+      setAddingCommitteeMember(null);
+    } catch { toast.error("Failed to add member."); }
+  }
+
+  async function removeCommitteeMember(c: Committee, uid: string) {
+    try {
+      await updateDoc(doc(db, "committees", c.id), { memberUids: c.memberUids.filter((id) => id !== uid) });
+      toast.success("Member removed.");
+    } catch { toast.error("Failed to remove member."); }
+  }
 
   async function createCategory() {
     const name = newCatName.trim();
@@ -553,6 +631,158 @@ export default function Users() {
                           >
                             <Plus className="h-3.5 w-3.5" />
                             Add member
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+
+        {/* ── Committee Management ── */}
+        <div className="glass-card !p-0 overflow-hidden">
+          <div className="flex items-center gap-2 px-5 py-4 border-b border-white/06">
+            <UsersIcon className="h-4 w-4 text-emerald-400" />
+            <span className="text-sm font-semibold text-foreground">Committees</span>
+            <span className="ml-auto text-xs text-muted-foreground">{committees.length} committees</span>
+          </div>
+
+          {/* Create new committee */}
+          <div className="p-4 border-b border-white/06 space-y-2">
+            <div className="flex gap-2">
+              <Input value={newCommittee.name} onChange={(e) => setNewCommittee((p) => ({ ...p, name: e.target.value }))}
+                onKeyDown={(e) => e.key === "Enter" && createCommittee()}
+                placeholder="Committee name…" className="rounded-xl border border-white/10 bg-white/05 text-sm" />
+              <input type="color" value={newCommittee.color}
+                onChange={(e) => setNewCommittee((p) => ({ ...p, color: e.target.value }))}
+                className="h-10 w-10 rounded-xl border border-white/10 bg-white/05 cursor-pointer p-0.5 shrink-0" />
+              <Button onClick={createCommittee} disabled={creatingCommittee || !newCommittee.name.trim()} className="shrink-0 gap-1.5">
+                {creatingCommittee ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />} Add
+              </Button>
+            </div>
+            <Input value={newCommittee.description} onChange={(e) => setNewCommittee((p) => ({ ...p, description: e.target.value }))}
+              placeholder="Description (optional)…" className="rounded-xl border border-white/10 bg-white/05 text-sm" />
+            <select value={newCommittee.leadUid} onChange={(e) => setNewCommittee((p) => ({ ...p, leadUid: e.target.value }))}
+              className="w-full rounded-xl border border-white/10 bg-white/05 px-3 py-2 text-sm text-foreground focus:outline-none">
+              <option value="">Select lead (optional)</option>
+              {users.filter((u) => u.role === "staff" || u.role === "admin").map((u) => (
+                <option key={u.uid} value={u.uid}>{u.displayName || u.email}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Committee list */}
+          {committeeLoading ? (
+            <div className="flex justify-center py-10"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
+          ) : committees.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-10">No committees yet.</p>
+          ) : (
+            <ul className="divide-y divide-white/05">
+              {committees.map((c) => {
+                const members = users.filter((u) => c.memberUids.includes(u.uid));
+                const lead = users.find((u) => u.uid === c.leadUid);
+                const isExpanded = expandedCommittee === c.id;
+                const isEditing = editingCommittee === c.id;
+                const isAddingHere = addingCommitteeMember === c.id;
+                const nonMembers = users.filter((u) => !c.memberUids.includes(u.uid) && (u.role === "staff" || u.role === "volunteer" || u.role === "admin"));
+                return (
+                  <li key={c.id} className="p-4 space-y-3">
+                    <div className="flex items-center gap-3">
+                      <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: c.color }} />
+                      <button onClick={() => setExpandedCommittee(isExpanded ? null : c.id)}
+                        className="flex-1 flex items-center gap-2 text-left">
+                        <span className="text-sm font-semibold text-foreground">{c.name}</span>
+                        <span className="text-xs text-muted-foreground">{members.length} member{members.length !== 1 ? "s" : ""}</span>
+                        {lead && <span className="text-xs text-muted-foreground">· Lead: {lead.displayName}</span>}
+                        {isExpanded ? <ChevronUp className="h-4 w-4 text-muted-foreground ml-auto" /> : <ChevronDown className="h-4 w-4 text-muted-foreground ml-auto" />}
+                      </button>
+                      <button onClick={() => setEditingCommittee(isEditing ? null : c.id)}
+                        className="p-1.5 rounded-lg text-muted-foreground hover:text-violet-400 hover:bg-violet-500/10 transition-colors">
+                        <Shield className="h-4 w-4" />
+                      </button>
+                      <button onClick={() => deleteCommittee(c as Committee)}
+                        className="p-1.5 rounded-lg text-red-400/60 hover:text-red-400 hover:bg-red-500/10 transition-colors">
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+
+                    {c.description && !isExpanded && (
+                      <p className="text-xs text-muted-foreground pl-5">{c.description}</p>
+                    )}
+
+                    {/* Edit form */}
+                    {isEditing && (
+                      <div className="space-y-2 pl-1 pt-1">
+                        <Input defaultValue={c.name} id={`edit-name-${c.id}`}
+                          className="rounded-xl border border-white/10 bg-white/05 text-sm" placeholder="Name" />
+                        <Input defaultValue={c.description || ""} id={`edit-desc-${c.id}`}
+                          className="rounded-xl border border-white/10 bg-white/05 text-sm" placeholder="Description" />
+                        <select defaultValue={c.leadUid || ""} id={`edit-lead-${c.id}`}
+                          className="w-full rounded-xl border border-white/10 bg-white/05 px-3 py-2 text-sm text-foreground focus:outline-none">
+                          <option value="">No lead</option>
+                          {users.filter((u) => u.role === "staff" || u.role === "admin").map((u) => (
+                            <option key={u.uid} value={u.uid}>{u.displayName || u.email}</option>
+                          ))}
+                        </select>
+                        <div className="flex gap-2">
+                          <input type="color" defaultValue={c.color} id={`edit-color-${c.id}`}
+                            className="h-9 w-9 rounded-lg border border-white/10 cursor-pointer p-0.5 bg-transparent" />
+                          <Button size="sm" onClick={() => {
+                            const name = (document.getElementById(`edit-name-${c.id}`) as HTMLInputElement)?.value.trim();
+                            const description = (document.getElementById(`edit-desc-${c.id}`) as HTMLInputElement)?.value.trim();
+                            const leadUid = (document.getElementById(`edit-lead-${c.id}`) as HTMLSelectElement)?.value;
+                            const color = (document.getElementById(`edit-color-${c.id}`) as HTMLInputElement)?.value;
+                            if (name) updateCommittee(c as Committee, { name, description, leadUid: leadUid || undefined, color });
+                          }}>Save</Button>
+                          <Button size="sm" variant="ghost" onClick={() => setEditingCommittee(null)}>Cancel</Button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Expanded members */}
+                    {isExpanded && (
+                      <div className="space-y-2 pl-1">
+                        {c.description && <p className="text-xs text-muted-foreground">{c.description}</p>}
+                        {members.length > 0 ? (
+                          <div className="space-y-1.5">
+                            {members.map((u) => (
+                              <div key={u.uid} className="flex items-center gap-2.5 py-1 px-2 rounded-lg bg-white/03">
+                                {u.photoURL ? <img src={u.photoURL} alt="" className="h-6 w-6 rounded-full object-cover" />
+                                  : <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-500/20 text-[10px] font-bold text-emerald-300">{(u.displayName || u.email || "?")[0].toUpperCase()}</div>}
+                                <span className="flex-1 text-sm text-foreground truncate">{u.displayName || u.email}</span>
+                                {u.uid === c.leadUid && <span className="text-[10px] text-emerald-400 font-medium">Lead</span>}
+                                <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-medium capitalize", u.role ? roleColors[u.role] : "bg-white/08 text-muted-foreground")}>{u.role ?? "—"}</span>
+                                <button onClick={() => removeCommitteeMember(c as Committee, u.uid)}
+                                  className="p-1 rounded-lg text-red-400/50 hover:text-red-400 hover:bg-red-500/10 transition-colors">
+                                  <X className="h-3.5 w-3.5" />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        ) : <p className="text-xs text-muted-foreground pl-2">No members yet.</p>}
+
+                        {isAddingHere ? (
+                          <div className="space-y-1.5 pt-1">
+                            <p className="text-xs text-muted-foreground font-medium">Add member:</p>
+                            {nonMembers.length === 0 ? <p className="text-xs text-muted-foreground">All eligible users are already in this committee.</p>
+                              : nonMembers.map((u) => (
+                                <button key={u.uid} onClick={() => addCommitteeMember(c as Committee, u.uid)}
+                                  className="w-full flex items-center gap-2.5 py-1.5 px-2 rounded-lg hover:bg-white/06 transition-colors text-left">
+                                  {u.photoURL ? <img src={u.photoURL} alt="" className="h-6 w-6 rounded-full object-cover" />
+                                    : <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-500/20 text-[10px] font-bold text-emerald-300">{(u.displayName || u.email || "?")[0].toUpperCase()}</div>}
+                                  <span className="flex-1 text-sm text-foreground truncate">{u.displayName || u.email}</span>
+                                  <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-medium capitalize", u.role ? roleColors[u.role] : "bg-white/08 text-muted-foreground")}>{u.role ?? "—"}</span>
+                                </button>
+                              ))}
+                            <button onClick={() => setAddingCommitteeMember(null)} className="text-xs text-muted-foreground hover:text-foreground mt-1">Cancel</button>
+                          </div>
+                        ) : (
+                          <button onClick={() => setAddingCommitteeMember(c.id)}
+                            className="flex items-center gap-1.5 text-xs text-emerald-400 hover:text-emerald-300 transition-colors pt-1">
+                            <Plus className="h-3.5 w-3.5" /> Add member
                           </button>
                         )}
                       </div>
