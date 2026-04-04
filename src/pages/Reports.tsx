@@ -377,7 +377,9 @@ export default function Reports() {
                   mB = metrics(eB ? [eB] : [], eB?.title?.slice(0, 18) || "Event B", "#EC4899");
                 }
 
-                const METRIC_KEYS = ["Events Done", "Total Events", "Participants", "Photos"] as const;
+                const METRIC_KEYS = (compareMode === "event"
+                  ? ["Total Events", "Participants", "Photos"]
+                  : ["Events Done", "Total Events", "Participants", "Photos"]) as readonly string[];
                 const data = METRIC_KEYS.map((k) => ({
                   metric: k,
                   [mA.label]: mA[k],
