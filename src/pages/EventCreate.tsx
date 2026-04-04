@@ -20,6 +20,7 @@ interface FormState {
   title: string; description: string; location: string;
   startDate: string; endDate: string; category: string; tags: string;
   enrollmentType: EnrollmentType; capacity: number; assignedTo: string[];
+  committees: string[];
 }
 
 const inputClass =
@@ -39,7 +40,7 @@ export default function EventCreate() {
   const navigate = useNavigate();
   const [form, setForm] = useState<FormState>({
     title: "", description: "", location: "", startDate: "", endDate: "",
-    category: "", tags: "", enrollmentType: "assigned", capacity: 0, assignedTo: [],
+    category: "", tags: "", enrollmentType: "assigned", capacity: 0, assignedTo: [], committees: [],
   });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -47,6 +48,7 @@ export default function EventCreate() {
   const [userSearch, setUserSearch] = useState("");
   const [showUserDropdown, setShowUserDropdown] = useState(false);
   const [categoryOptions, setCategoryOptions] = useState<{ name: string; color: string }[]>([]);
+  const [committeeOptions, setCommitteeOptions] = useState<{ id: string; name: string; color: string }[]>([]);
 
   const isAdminStaff = role === "admin" || role === "staff";
 
@@ -62,6 +64,16 @@ export default function EventCreate() {
     const unsub = onSnapshot(
       query(collection(db, "eventCategories"), orderBy("createdAt", "asc")),
       (snap) => setCategoryOptions(snap.docs.map((d) => ({ name: d.data().name as string, color: d.data().color as string }))),
+      () => {}
+    );
+    return unsub;
+  }, []);
+
+  // Live committees from Firestore
+  useEffect(() => {
+    const unsub = onSnapshot(
+      query(collection(db, "committees"), orderBy("createdAt", "asc")),
+      (snap) => setCommitteeOptions(snap.docs.map((d) => ({ id: d.id, name: d.data().name as string, color: d.data().color as string }))),
       () => {}
     );
     return unsub;
@@ -119,6 +131,7 @@ export default function EventCreate() {
         capacity: form.capacity,
         attendees,
         joinRequests: [],
+        committees: form.committees,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
@@ -208,6 +221,35 @@ export default function EventCreate() {
               </Field>
             </div>
           </div>
+
+          {isAdminStaff && committeeOptions.length > 0 && (
+            <div className="glass-card space-y-3">
+              <h3 className="text-sm font-semibold text-foreground">Committees</h3>
+              <p className="text-xs text-muted-foreground">Select committees involved in this event</p>
+              <div className="flex flex-wrap gap-2">
+                {committeeOptions.map((c) => {
+                  const selected = form.committees.includes(c.id);
+                  return (
+                    <button key={c.id} type="button"
+                      onClick={() => setForm((p) => ({
+                        ...p,
+                        committees: selected ? p.committees.filter((id) => id !== c.id) : [...p.committees, c.id],
+                      }))}
+                      className="flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition-all border"
+                      style={{
+                        backgroundColor: selected ? `${c.color}30` : "transparent",
+                        borderColor: selected ? c.color : "rgba(255,255,255,0.1)",
+                        color: selected ? c.color : "hsl(var(--muted-foreground))",
+                      }}
+                    >
+                      <span className="w-2 h-2 rounded-full" style={{ backgroundColor: c.color }} />
+                      {c.name}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {isAdminStaff && (
             <div className="glass-card space-y-4">
