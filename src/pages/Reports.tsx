@@ -183,7 +183,7 @@ export default function Reports() {
     [...events]
       .sort((a, b) => ((b.attendees?.length ?? 0) + (b.assignedTo?.length ?? 0)) - ((a.attendees?.length ?? 0) + (a.assignedTo?.length ?? 0)))
       .slice(0, 5)
-      .map((e) => ({ name: e.title.slice(0, 20), participants: (e.attendees?.length ?? 0) + (e.assignedTo?.length ?? 0) })),
+      .map((e) => ({ name: e.title.slice(0, 20), participants: new Set([...(e.assignedTo || []), ...(e.attendees || []).map((a: {uid:string}) => a.uid)]).size })),
     [events]
   );
 
