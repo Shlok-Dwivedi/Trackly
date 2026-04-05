@@ -351,15 +351,19 @@ export default function Reports() {
             <ResponsiveContainer width="100%" height="100%">
               {(() => {
                 // Shared metric builder — same 4 metrics for all 3 modes
-                const metrics = (evList: FirestoreEvent[], label: string, color: string) => ({
-                  label, color,
-                  "Events Done": evList.filter((e) => e.status === "Completed").length,
-                  "Total Events": evList.length,
-                  "Participants": new Set([...evList.flatMap((e) => e.assignedTo || []), ...evList.flatMap((e) => (e.attendees || []).map((a: {uid:string}) => a.uid))]).size,
-                  "Assigned": evList.reduce((acc, e) => acc + (e.assignedTo?.length ?? 0), 0),
-                  "Attendees": evList.reduce((acc, e) => acc + (e.attendees?.length ?? 0), 0),
-                  "Photos": evList.reduce((acc, e) => acc + (e.photos?.length ?? 0), 0),
-                });
+                const metrics = (evList: FirestoreEvent[], label: string, color: string) => {
+                  const participants = new Set([...evList.flatMap((e) => e.assignedTo || []), ...evList.flatMap((e) => (e.attendees || []).map((a: {uid:string}) => a.uid))]).size;
+                  const totalCap = evList.reduce((acc, e) => acc + (e.capacity && e.capacity > 0 ? e.capacity : 0), 0);
+                  const attendanceRate = totalCap > 0 ? Math.round((participants / totalCap) * 100) : 0;
+                  const durationHrs = evList.length === 1 ? Math.round((toMs(evList[0].endDate) - toMs(evList[0].startDate)) / 3600000) : 0;
+                  return {
+                    label, color,
+                    "Events": evList.length,
+                    "Participants": participants,
+                    "Attendance Rate %": attendanceRate,
+                    "Duration (hrs)": durationHrs,
+                  };
+                };
 
                 let mA: ReturnType<typeof metrics>;
                 let mB: ReturnType<typeof metrics>;
@@ -380,10 +384,8 @@ export default function Reports() {
                 }
 
                 const METRIC_KEYS = (compareMode === "event"
-                  ? ["Assigned", "Attendees", "Photos"]
-                  : compareMode === "year"
-                  ? ["Total Events", "Events Done", "Participants", "Photos"]
-                  : ["Total Events", "Events Done", "Participants", "Photos"]) as readonly string[];
+                  ? ["Participants", "Attendance Rate %", "Duration (hrs)"]
+                  : ["Events", "Participants", "Attendance Rate %"]) as readonly string[];
                 const data = METRIC_KEYS.map((k) => ({
                   metric: k,
                   [mA.label]: mA[k],
