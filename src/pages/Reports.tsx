@@ -20,7 +20,10 @@ function toMs(val: unknown): number {
   if (!val) return 0;
   if (typeof val === "object" && val !== null && "toMillis" in val)
     return (val as { toMillis: () => number }).toMillis();
+  if (typeof val === "object" && val !== null && "seconds" in val)
+    return (val as { seconds: number }).seconds * 1000;
   if (typeof val === "number") return val < 1e12 ? val * 1000 : val;
+  if (typeof val === "string") { const d = Date.parse(val); return isNaN(d) ? 0 : d; }
   return 0;
 }
 
@@ -352,10 +355,28 @@ export default function Reports() {
               {(() => {
                 // Shared metric builder — same 4 metrics for all 3 modes
                 const metrics = (evList: FirestoreEvent[], label: string, color: string) => {
-                  const participants = new Set([...evList.flatMap((e) => e.assignedTo || []), ...evList.flatMap((e) => (e.attendees || []).map((a: {uid:string}) => a.uid))]).size;
-                  const totalCap = evList.reduce((acc, e) => acc + (e.capacity && e.capacity > 0 ? e.capacity : 0), 0);
-                  const attendanceRate = totalCap > 0 ? Math.round((participants / totalCap) * 100) : 0;
-                  const durationHrs = evList.length === 1 ? Math.round((toMs(evList[0].endDate) - toMs(evList[0].startDate)) / 3600000) : 0;
+                  // Count unique participants: assignedTo UIDs + attendee UIDs (deduped)
+                  const allUids = new Set([
+                    ...evList.flatMap((e) => e.assignedTo || []),
+                    ...evList.flatMap((e) => (e.attendees || []).map((a: {uid:string}) => a.uid)),
+                  ]);
+                  const participants = allUids.size;
+                  // Attendance rate: per-event avg of (actual / capacity) for events that have capacity set
+                  const cappedEvents = evList.filter((e) => e.capacity && e.capacity > 0);
+                  const attendanceRate = cappedEvents.length > 0
+                    ? Math.round(
+                        cappedEvents.reduce((acc, e) => {
+                          const actual = new Set([
+                            ...(e.assignedTo || []),
+                            ...(e.attendees || []).map((a: {uid:string}) => a.uid),
+                          ]).size;
+                          return acc + Math.min(100, Math.round((actual / e.capacity!) * 100));
+                        }, 0) / cappedEvents.length
+                      )
+                    : 0;
+                  const durationHrs = evList.length === 1
+                    ? Math.round((toMs(evList[0].endDate) - toMs(evList[0].startDate)) / 3600000)
+                    : 0;
                   return {
                     label, color,
                     "Events": evList.length,
