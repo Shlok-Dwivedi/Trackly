@@ -66,7 +66,7 @@ export default function Reports() {
   const [compareMonthA, setCompareMonthA] = useState(new Date().getMonth());
   const [compareMonthB, setCompareMonthB] = useState((new Date().getMonth() - 1 + 12) % 12);
   const [compareYearA, setCompareYearA] = useState(new Date().getFullYear());
-  const [compareYearB, setCompareYearB] = useState(new Date().getFullYear() - 1);
+  const [compareYearB, setCompareYearB] = useState(new Date().getMonth() === 0 ? new Date().getFullYear() - 1 : new Date().getFullYear());
   // Event comparison selectors
   const [compareEventA, setCompareEventA] = useState<string>("");
   const [compareEventB, setCompareEventB] = useState<string>("");
