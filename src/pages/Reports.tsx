@@ -44,11 +44,14 @@ function buildVolunteerData(events: FirestoreEvent[]) {
 
 function CustomTooltip({ active, payload, label }: { active?: boolean; payload?: { value: number; name?: string; color?: string }[]; label?: string }) {
   if (!active || !payload?.length) return null;
+  const isRate = label === "Attendance Rate %";
   return (
     <div className="glass-card !p-3 !rounded-xl border border-violet-500/20 text-sm space-y-1">
       <p className="text-muted-foreground text-xs mb-1">{label}</p>
       {payload.map((p, i) => (
-        <p key={i} className="font-bold" style={{ color: p.color }}>{p.name ? `${p.name}: ` : ""}{p.value}</p>
+        <p key={i} className="font-bold" style={{ color: p.color }}>
+          {p.name ? `${p.name}: ` : ""}{p.value}{isRate ? "%" : ""}
+        </p>
       ))}
     </div>
   );
@@ -417,7 +420,12 @@ export default function Reports() {
                   <BarChart data={data}>
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
                     <XAxis dataKey="metric" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} axisLine={false} tickLine={false} />
-                    <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} axisLine={false} tickLine={false} allowDecimals={false} />
+                    <YAxis
+                      tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }}
+                      axisLine={false} tickLine={false} allowDecimals={false}
+                      domain={METRIC_KEYS.includes("Attendance Rate %") ? [0, 100] : [0, "auto"]}
+                      tickFormatter={(v) => METRIC_KEYS.length === 1 && METRIC_KEYS[0] === "Attendance Rate %" ? `${v}%` : String(v)}
+                    />
                     <Tooltip content={<CustomTooltip />} wrapperStyle={{ background: "transparent", border: "none", boxShadow: "none" }} cursor={{ fill: "rgba(255,255,255,0.04)" }} />
                     <Legend wrapperStyle={{ fontSize: "11px", color: "hsl(var(--muted-foreground))" }} />
                     <Bar dataKey={mA.label} fill={mA.color} radius={[4,4,0,0]} />
