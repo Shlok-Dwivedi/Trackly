@@ -39,12 +39,24 @@ export interface JoinRequest {
   note?: string;
 }
 
+export interface Committee {
+  id: string;
+  name: string;
+  description?: string;
+  color: string;
+  leadUid?: string;
+  memberUids: string[];
+  createdAt: number;
+}
+
 export interface Attendee {
   uid: string;
   displayName: string;
   photoURL?: string;
   joinedAt: number; // Unix timestamp
   joinType: JoinType;
+  committeeId?: string;
+  committeeName?: string;
 }
 
 export interface FirestoreEvent {
@@ -64,6 +76,7 @@ export interface FirestoreEvent {
   coverPhotoUrl?: string;
   coverPosition?: string;
   coverZoom?: number;
+  committees?: string[]; // committee IDs associated with this event
   // Enrollment fields
   enrollmentType?: EnrollmentType;
   capacity?: number;

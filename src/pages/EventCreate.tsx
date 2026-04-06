@@ -20,6 +20,7 @@ interface FormState {
   title: string; description: string; location: string;
   startDate: string; endDate: string; category: string; tags: string;
   enrollmentType: EnrollmentType; capacity: number; assignedTo: string[];
+  committees: string[];
 }
 
 const inputClass =
@@ -39,7 +40,7 @@ export default function EventCreate() {
   const navigate = useNavigate();
   const [form, setForm] = useState<FormState>({
     title: "", description: "", location: "", startDate: "", endDate: "",
-    category: "", tags: "", enrollmentType: "assigned", capacity: 0, assignedTo: [],
+    category: "", tags: "", enrollmentType: "assigned", capacity: 0, assignedTo: [], committees: [],
   });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -47,6 +48,8 @@ export default function EventCreate() {
   const [userSearch, setUserSearch] = useState("");
   const [showUserDropdown, setShowUserDropdown] = useState(false);
   const [categoryOptions, setCategoryOptions] = useState<{ name: string; color: string }[]>([]);
+  const [committeeOptions, setCommitteeOptions] = useState<{ id: string; name: string; color: string }[]>([]);
+  const [assigneeCommittees, setAssigneeCommittees] = useState<Record<string, string>>({}); // uid → committeeId
 
   const isAdminStaff = role === "admin" || role === "staff";
 
@@ -62,6 +65,16 @@ export default function EventCreate() {
     const unsub = onSnapshot(
       query(collection(db, "eventCategories"), orderBy("createdAt", "asc")),
       (snap) => setCategoryOptions(snap.docs.map((d) => ({ name: d.data().name as string, color: d.data().color as string }))),
+      () => {}
+    );
+    return unsub;
+  }, []);
+
+  // Live committees from Firestore
+  useEffect(() => {
+    const unsub = onSnapshot(
+      query(collection(db, "committees"), orderBy("createdAt", "asc")),
+      (snap) => setCommitteeOptions(snap.docs.map((d) => ({ id: d.id, name: d.data().name as string, color: d.data().color as string }))),
       () => {}
     );
     return unsub;
@@ -102,7 +115,9 @@ export default function EventCreate() {
     try {
       const attendees: Attendee[] = form.assignedTo.map((uid) => {
         const u = users.find((x) => x.uid === uid);
-        return { uid, displayName: u?.displayName || "Unknown", joinedAt: Date.now(), joinType: "assigned" as const };
+        const committeeId = assigneeCommittees[uid];
+        const committee = committeeOptions.find((c) => c.id === committeeId);
+        return { uid, displayName: u?.displayName || "Unknown", joinedAt: Date.now(), joinType: "assigned" as const, committeeId, committeeName: committee?.name };
       });
       const docRef = await addDoc(collection(db, "events"), {
         title: form.title.trim(),
@@ -119,6 +134,7 @@ export default function EventCreate() {
         capacity: form.capacity,
         attendees,
         joinRequests: [],
+        committees: form.committees,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
@@ -209,6 +225,35 @@ export default function EventCreate() {
             </div>
           </div>
 
+          {isAdminStaff && committeeOptions.length > 0 && (
+            <div className="glass-card space-y-3">
+              <h3 className="text-sm font-semibold text-foreground">Committees</h3>
+              <p className="text-xs text-muted-foreground">Select committees involved in this event</p>
+              <div className="flex flex-wrap gap-2">
+                {committeeOptions.map((c) => {
+                  const selected = form.committees.includes(c.id);
+                  return (
+                    <button key={c.id} type="button"
+                      onClick={() => setForm((p) => ({
+                        ...p,
+                        committees: selected ? p.committees.filter((id) => id !== c.id) : [...p.committees, c.id],
+                      }))}
+                      className="flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition-all border"
+                      style={{
+                        backgroundColor: selected ? `${c.color}30` : "transparent",
+                        borderColor: selected ? c.color : "rgba(255,255,255,0.1)",
+                        color: selected ? c.color : "hsl(var(--muted-foreground))",
+                      }}
+                    >
+                      <span className="w-2 h-2 rounded-full" style={{ backgroundColor: c.color }} />
+                      {c.name}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {isAdminStaff && (
             <div className="glass-card space-y-4">
               <h3 className="text-sm font-semibold text-foreground">Enrollment Settings</h3>
@@ -227,15 +272,31 @@ export default function EventCreate() {
               <Field label="Assign To">
                 <div className="relative">
                   {assignedUsers.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5 mb-2">
-                      {assignedUsers.map((u) => (
-                        <span key={u.uid} className="inline-flex items-center gap-1 rounded-full bg-violet-500/20 text-violet-300 px-2.5 py-1 text-xs font-medium">
-                          {u.displayName}
-                          <button type="button" onClick={() => toggleUser(u.uid)} className="hover:text-white ml-0.5">
-                            <X className="h-3 w-3" />
-                          </button>
-                        </span>
-                      ))}
+                    <div className="space-y-1.5 mb-2">
+                      {assignedUsers.map((u) => {
+                        const selCommittee = committeeOptions.find((c) => c.id === assigneeCommittees[u.uid]);
+                        return (
+                          <div key={u.uid} className="flex items-center gap-2 rounded-xl bg-violet-500/10 px-2.5 py-1.5">
+                            <span className="text-xs font-medium text-violet-300 flex-1">{u.displayName}</span>
+                            {committeeOptions.length > 0 && (
+                              <select
+                                value={assigneeCommittees[u.uid] || ""}
+                                onChange={(e) => setAssigneeCommittees((p) => ({ ...p, [u.uid]: e.target.value }))}
+                                className="rounded-lg border border-white/10 bg-background text-xs text-foreground px-2 py-1 focus:outline-none"
+                                style={{ borderColor: selCommittee ? selCommittee.color : undefined }}
+                              >
+                                <option value="">No committee</option>
+                                {committeeOptions.map((c) => (
+                                  <option key={c.id} value={c.id}>{c.name}</option>
+                                ))}
+                              </select>
+                            )}
+                            <button type="button" onClick={() => toggleUser(u.uid)} className="hover:text-white text-violet-300/60 ml-0.5">
+                              <X className="h-3 w-3" />
+                            </button>
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
                   <div className="relative">
