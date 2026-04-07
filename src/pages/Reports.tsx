@@ -271,12 +271,12 @@ export default function Reports() {
         <div className="glass-card p-4 sm:p-6 space-y-4">
           <div className="flex items-center justify-between flex-wrap gap-3">
             <h3 className="font-semibold text-foreground">Comparison</h3>
-            <div className="flex gap-1 glass rounded-xl p-1">
+            <div className="flex gap-1 glass rounded-xl p-1 text-xs">
               {(["month", "year", "event"] as CompareMode[]).map((m) => (
                 <button key={m} onClick={() => setCompareMode(m)}
-                  className={cn("px-3 py-1.5 rounded-lg text-xs font-medium transition-all",
+                  className={cn("px-2 py-1.5 rounded-lg font-medium transition-all whitespace-nowrap",
                     compareMode === m ? "bg-violet-600 text-white" : "text-muted-foreground hover:text-foreground")}>
-                  {m === "month" ? "Month vs Month" : m === "year" ? "Year vs Year" : "Event vs Event"}
+                  {m === "month" ? "Month/Month" : m === "year" ? "Year/Year" : "Event/Event"}
                 </button>
               ))}
             </div>
@@ -423,8 +423,12 @@ export default function Reports() {
                     <YAxis
                       tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }}
                       axisLine={false} tickLine={false} allowDecimals={false}
-                      domain={METRIC_KEYS.includes("Attendance Rate %") ? [0, 100] : [0, "auto"]}
-                      tickFormatter={(v) => METRIC_KEYS.length === 1 && METRIC_KEYS[0] === "Attendance Rate %" ? `${v}%` : String(v)}
+                      domain={[0, "auto"]}
+                      tickFormatter={(v) => {
+                        const hasRate = METRIC_KEYS.includes("Attendance Rate %");
+                        const isRateOnly = METRIC_KEYS.length === 1 && hasRate;
+                        return isRateOnly ? `${v}%` : String(v);
+                      }}
                     />
                     <Tooltip content={<CustomTooltip />} wrapperStyle={{ background: "transparent", border: "none", boxShadow: "none" }} cursor={{ fill: "rgba(255,255,255,0.04)" }} />
                     <Legend wrapperStyle={{ fontSize: "11px", color: "hsl(var(--muted-foreground))" }} />
