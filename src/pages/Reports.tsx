@@ -353,7 +353,8 @@ export default function Reports() {
             </div>
           )}
 
-          <div className="h-56">
+          <div className="overflow-x-auto -mx-1 sm:mx-0">
+            <div style={{ minWidth: "360px" }} className="h-56">
             <ResponsiveContainer width="100%" height="100%">
               {(() => {
                 // Shared metric builder — same 4 metrics for all 3 modes
@@ -419,7 +420,7 @@ export default function Reports() {
                 return (
                   <BarChart data={data}>
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
-                    <XAxis dataKey="metric" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} axisLine={false} tickLine={false} />
+                    <XAxis dataKey="metric" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} axisLine={false} tickLine={false} interval={0} />
                     <YAxis
                       tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }}
                       axisLine={false} tickLine={false} allowDecimals={false}
@@ -438,6 +439,7 @@ export default function Reports() {
                 );
               })()}
             </ResponsiveContainer>
+            </div>
           </div>
         </div>
 
