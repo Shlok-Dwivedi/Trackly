@@ -145,6 +145,13 @@ export default function Reports() {
     return ["All", ...Array.from(tags)];
   }, [events]);
 
+  // Unique event titles for autocomplete suggestions
+  const suggestedTitles = useMemo(() => {
+    const titles = new Set<string>();
+    events.forEach(e => { if (e.title) titles.add(e.title); });
+    return Array.from(titles).sort();
+  }, [events]);
+
   // Advanced Timeline Data Processing with Prediction
   const historyData = useMemo(() => {
     const now = new Date();
@@ -470,8 +477,12 @@ export default function Reports() {
                 placeholder="Search events..." 
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
+                list="event-titles"
                 className="w-full rounded-xl border border-white/08 bg-white/03 px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-violet-500/30"
               />
+              <datalist id="event-titles">
+                {suggestedTitles.map(t => <option key={t} value={t} />)}
+              </datalist>
             </div>
             <div className="space-y-1">
               <label className="text-[10px] font-medium text-muted-foreground ml-1">Filter by Tag</label>
