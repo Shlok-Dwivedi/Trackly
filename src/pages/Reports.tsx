@@ -82,7 +82,6 @@ export default function Reports() {
   // Advanced History & Projection States
   const [historyTimeframe, setHistoryTimeframe] = useState<"5y" | "12m">("5y");
   const [historyCategory, setHistoryCategory] = useState<string>("All");
-  const [selectedTag, setSelectedTag] = useState<string>("All");
   const [searchQuery, setSearchQuery] = useState<string>("");
 
   useEffect(() => {
@@ -138,11 +137,6 @@ export default function Reports() {
     }).sort((a, b) => toMs(a.startDate) - toMs(b.startDate));
   }, [events]);
 
-  // All unique tags available across all events
-  const allTags = useMemo(() => {
-    const tags = new Set<string>();
-    events.forEach(e => (e.tags || []).forEach(t => tags.add(t)));
-    return ["All", ...Array.from(tags)];
   }, [events]);
 
   // Unique event titles for autocomplete suggestions
@@ -160,9 +154,8 @@ export default function Reports() {
     // 1. Filter events based on history filters (Keyword, Tag, Category)
     const filtered = events.filter(e => {
       const matchCat = historyCategory === "All" || e.category === historyCategory;
-      const matchTag = selectedTag === "All" || (e.tags || []).includes(selectedTag);
       const matchSearch = !searchQuery || e.title.toLowerCase().includes(searchQuery.toLowerCase());
-      return matchCat && matchTag && matchSearch;
+      return matchCat && matchSearch;
     });
 
     if (historyTimeframe === "5y") {
@@ -469,7 +462,7 @@ export default function Reports() {
           </div>
 
           {/* History Filters */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1">
               <label className="text-[10px] font-medium text-muted-foreground ml-1">Series Search (e.g. "Annual")</label>
               <input 
@@ -483,16 +476,6 @@ export default function Reports() {
               <datalist id="event-titles">
                 {suggestedTitles.map(t => <option key={t} value={t} />)}
               </datalist>
-            </div>
-            <div className="space-y-1">
-              <label className="text-[10px] font-medium text-muted-foreground ml-1">Filter by Tag</label>
-              <select
-                value={selectedTag}
-                onChange={(e) => setSelectedTag(e.target.value)}
-                className="w-full rounded-xl border border-white/08 bg-white/03 px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-violet-500/30"
-              >
-                {allTags.map(t => <option key={t} value={t}>{t === "All" ? "All Tags" : `#${t}`}</option>)}
-              </select>
             </div>
             <div className="space-y-1">
               <label className="text-[10px] font-medium text-muted-foreground ml-1">Category</label>
