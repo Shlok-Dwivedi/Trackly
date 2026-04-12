@@ -1,0 +1,673 @@
+================================================================================
+NGO EDUCATION CALENDAR SYSTEM — MASTER CONTEXT & PROJECT PLAN
+================================================================================
+PURPOSE OF THIS FILE:
+  This document is designed to be fed to an LLM (Claude, ChatGPT, etc.) to give
+  full context of this project at any point in development. It contains every
+  decision made, the full tech stack, architecture, roles, data models, workflow,
+  and current status. Read this entire file before responding to any request.
+
+Last Updated: 2026-02-18
+Current Status: Planning complete. Frontend UI being generated via Lovable.
+                Backend not yet started.
+
+================================================================================
+1. WHO IS BUILDING THIS & WHY
+================================================================================
+Client: An education-focused NGO (name TBD)
+Goal: A centralized system to schedule, track, and manage NGO events and
+      activities — with accountability, reporting, and photo documentation.
+
+Team:
+  - Project lead / product owner (the person feeding you this file)
+  - Frontend developer (human, working on the React codebase)
+  - AI tools used: Claude (architecture + planning), Lovable (UI generation)
+
+The project lead is non-technical in some areas — explanations should be clear,
+avoid unnecessary jargon, and always flag decisions that need human input.
+
+================================================================================
+2. WHAT THE SYSTEM DOES
+================================================================================
+Core Features:
+  - Event creation, editing, deletion
+  - Event status lifecycle: Planned → Ongoing → Completed
+  - Photo uploads attached to events (documentation/evidence)
+  - Role-based access control (4 roles — see Section 5)
+  - In-app real-time notifications
+  - Mobile push notifications (browser + native mobile)
+  - Email notifications
+  - Google Calendar export/sync
+  - Dashboard with charts and reporting
+  - Staff performance and accountability monitoring
+
+================================================================================
+3. TECH STACK — FINAL DECISIONS (DO NOT SUGGEST ALTERNATIVES UNLESS ASKED)
+================================================================================
+
+FRONTEND
+  Framework:      React + Vite  (NOT Next.js — Ionic Capacitor works better with plain React)
+  Styling:        Tailwind CSS  (no other CSS frameworks, no inline styles)
+  Routing:        React Router v6
+  Charts:         Recharts
+  AI UI Tool:     Lovable (used to generate initial UI shell — see Section 9)
+
+BACKEND
+  Framework:      Python Flask
+  Purpose:        Handles only: role management, Google Calendar API, email triggers
+                  Everything else (auth, data, storage) is handled client-side
+  Hosting:        Render (free tier — spins down after 15min idle)
+  Sleep Fix:      UptimeRobot pings Render every 10 minutes to prevent cold starts
+
+AUTH & DATABASE
+  Auth:           Firebase Authentication (email/password + Google OAuth)
+  Database:       Firebase Firestore (real-time NoSQL)
+  Roles:          Firebase custom claims (set SERVER-SIDE by Flask only)
+  Push (web):     Firebase Cloud Messaging (FCM) Web SDK
+  Push (mobile):  FCM via Ionic Capacitor @capacitor/push-notifications
+
+FILE STORAGE
+  Provider:       Supabase Storage (photos only)
+  Method:         Direct upload from frontend using Supabase JS SDK
+                  NO backend/Flask involved in uploads — keeps Render usage low
+  Free limit:     1GB storage, 2GB bandwidth/month
+
+HOSTING — ALL FREE TIER
+  Frontend:       Vercel (auto-deploys from GitHub, custom domain supported)
+  Backend:        Render (Flask API, free tier)
+  Uptime:         UptimeRobot (free, pings Render every 10min)
+
+EMAIL
+  Provider:       Resend (free 3,000 emails/month, 100/day)
+  Trigger:        Called from Flask (not directly from frontend)
+
+MOBILE (PHASE 2 — NOT YET STARTED)
+  Tool:           Ionic Capacitor (wraps existing React app into native mobile)
+  Target:         Android first, iOS later (iOS needs Mac + Apple Developer account)
+  Camera:         @capacitor/camera (replaces file input for photo capture)
+  Push:           @capacitor/push-notifications (FCM integration)
+
+================================================================================
+4. ARCHITECTURE — HOW PIECES CONNECT
+================================================================================
+
+  [React Frontend] ──── Firebase JS SDK ────► [Firestore DB]
+       │                                            │
+       │──── Supabase JS SDK ────► [Supabase Storage (photos)]
+       │
+       │──── FCM Web SDK ─────► [Firebase Cloud Messaging]
+       │
+       │──── HTTP calls ──────► [Flask Backend on Render]
+                                       │
+                                       ├──► Firebase Admin SDK (set custom claims)
+                                       ├──► Google Calendar API
+                                       ├──► Resend (email)
+                                       └──► FCM Admin SDK (server-side push triggers)
+
+KEY RULE: Flask is only called for 2 things from the frontend:
+  1. POST /api/auth/set-role    — Admin assigns a role to a user
+  2. POST /api/calendar/export  — Export an event to Google Calendar
+
+Everything else (CRUD, real-time data, notifications, photo upload) is handled
+directly by the frontend using Firebase and Supabase SDKs.
+
+================================================================================
+5. ROLES & PERMISSIONS
+================================================================================
+Roles are stored as Firebase custom claims, set server-side by Flask.
+Frontend reads role via: auth.currentUser.getIdTokenResult() → claims.role
+NEVER trust the role from Firestore directly on the frontend (security risk).
+
+ADMIN
+  - Full access: create/edit/delete any event
+  - Manage users, assign/change roles
+  - View all dashboard reports and staff activity
+  - Export events to Google Calendar
+  - Receive all notification types
+
+STAFF / MEMBER
+  - Create new events
+  - Edit/update status on events they created or are assigned to
+  - Upload photos to their events
+  - View their own dashboard stats
+  - Cannot manage users or see other staff's private stats
+
+VOLUNTEER
+  - View events they are assigned to only
+  - Update status on their assigned events
+  - Upload photos to their assigned events
+  - Cannot create events
+
+VIEWER / READ-ONLY
+  - View events and dashboard only
+  - No create, edit, delete, or upload access
+
+ProtectedRoute component in React gates pages by role claim.
+
+================================================================================
+6. DATABASE SCHEMA (Firestore) — FULL DESIGN
+================================================================================
+
+OVERVIEW OF COLLECTIONS:
+  /users            — all registered users + roles + FCM tokens
+  /events           — all NGO events (core collection)
+  /notifications    — per-user notification inbox
+  /activityLog      — audit trail of all actions (admin reporting)
+  /appConfig        — global app settings (categories, NGO info)
+
+--------------------------------------------------------------------------------
+COLLECTION: /users/{uid}
+--------------------------------------------------------------------------------
+uid is the Firebase Auth UID — same as the document ID.
+
+  uid               string        same as document ID (for easy querying)
+  displayName       string        full name
+  email             string
+  photoURL          string        profile photo URL (from Google or uploaded)
+  role              string        "admin" | "staff" | "volunteer" | "viewer"
+                                  NOTE: source of truth is Firebase custom claim
+                                  This field is a readable copy for display only
+  phone             string        optional, for contact purposes
+  department        string        optional, e.g. "Field Team", "Admin Office"
+  isActive          boolean       false = deactivated account (can't login usefulness)
+  fcmTokens         array         [string, ...] list of FCM tokens (user may have
+                                  multiple devices — web + mobile)
+  createdAt         timestamp
+  updatedAt         timestamp
+  lastLoginAt       timestamp
+
+USAGE:
+  - Read on login to get display info
+  - Admin reads all users for User Management page
+  - fcmTokens updated on every login from every device
+  - role field used for display only — never for security decisions
+
+--------------------------------------------------------------------------------
+COLLECTION: /events/{eventId}
+--------------------------------------------------------------------------------
+Auto-generated document ID by Firestore.
+
+  title             string        event name
+  description       string        full description
+  location          string        physical or virtual location
+  startDate         timestamp
+  endDate           timestamp
+  allDay            boolean       if true, ignore time part of dates
+  status            string        "Planned" | "Ongoing" | "Completed" | "Cancelled"
+  priority          string        "Low" | "Medium" | "High"
+  category          string        "Workshop" | "Training" | "Outreach" |
+                                  "Meeting" | "Community Event" | "Other"
+  tags              array         [string, ...]  free-form tags
+
+  createdBy         string        uid of creator
+  assignedTo        array         [uid, uid, ...]  assigned staff/volunteers
+  attendees         array         [{ uid, name, status: "invited"|"confirmed"|"declined" }]
+
+  photos            array         [{
+                                    url: string,          Supabase public URL
+                                    uploadedBy: uid,
+                                    caption: string,
+                                    timestamp: timestamp
+                                  }]
+
+  attachments       array         [{
+                                    url: string,
+                                    name: string,
+                                    uploadedBy: uid,
+                                    timestamp: timestamp
+                                  }]
+
+  statusHistory     array         [{
+                                    status: string,
+                                    changedBy: uid,
+                                    changedAt: timestamp,
+                                    note: string
+                                  }]
+                                  tracks every status change for accountability
+
+  googleCalendarEventId  string   set after Google Calendar export
+  isRecurring       boolean
+  recurringRule     string        optional iCal RRULE string if recurring
+
+  createdAt         timestamp
+  updatedAt         timestamp
+  completedAt       timestamp     set when status → Completed
+
+USAGE:
+  - Main collection — everything revolves around this
+  - onSnapshot listener on dashboard for real-time updates
+  - Query by status for reporting
+  - Query by assignedTo for staff's own event list
+  - statusHistory powers the accountability/audit trail on dashboard
+  - photos array populated by Supabase uploads
+
+--------------------------------------------------------------------------------
+COLLECTION: /notifications/{notifId}
+--------------------------------------------------------------------------------
+Auto-generated document ID. One document per notification per user.
+
+  userId            string        uid of recipient (index this field)
+  title             string        short heading e.g. "New Event Assigned"
+  message           string        full notification text
+  type              string        "assignment" | "status_change" | "reminder" |
+                                  "photo_upload" | "new_user" | "mention"
+  read              boolean       false = unread (shown in badge count)
+  actionUrl         string        frontend route to navigate to e.g. "/events/abc123"
+  eventId           string        reference to related event (if applicable)
+  triggeredBy       string        uid of user who caused this notification
+  createdAt         timestamp
+
+USAGE:
+  - onSnapshot filtered by userId + read==false for real-time bell badge count
+  - Mark as read: update read=true when user opens notification
+  - Delete old notifications older than 30 days (cleanup job in Flask)
+  - Never query all notifications — always filter by userId
+
+--------------------------------------------------------------------------------
+COLLECTION: /activityLog/{logId}
+--------------------------------------------------------------------------------
+Append-only audit trail. Never update or delete documents here.
+
+  action            string        "event_created" | "event_updated" |
+                                  "status_changed" | "photo_uploaded" |
+                                  "user_role_changed" | "event_deleted" |
+                                  "user_login"
+  performedBy       string        uid of user who did the action
+  performedByName   string        display name (denormalized for easy display)
+  targetId          string        eventId or userId that was affected
+  targetType        string        "event" | "user"
+  targetTitle       string        event title or user name (denormalized)
+  details           map           {
+                                    previousValue: any,
+                                    newValue: any,
+                                    note: string
+                                  }
+  createdAt         timestamp
+
+USAGE:
+  - Admin dashboard "Recent Activity" feed
+  - Reports page — filter by performedBy for staff accountability
+  - Filter by action for specific reports (e.g. all status changes this month)
+  - Never update — only addDoc (append only)
+  - Written by frontend on every significant action
+
+--------------------------------------------------------------------------------
+COLLECTION: /appConfig/{configId}
+--------------------------------------------------------------------------------
+Small collection — usually just 1-2 documents for global settings.
+
+DOCUMENT: /appConfig/general
+  ngoName           string        "Trackly NGO" or actual NGO name
+  ngoLogo           string        URL to logo image
+  primaryColor      string        hex color for branding
+  supportEmail      string
+  timezone          string        e.g. "Asia/Kolkata"
+  updatedAt         timestamp
+  updatedBy         string        uid
+
+DOCUMENT: /appConfig/categories
+  list              array         ["Workshop", "Training", "Outreach", "Meeting",
+                                   "Community Event", "Other"]
+                                  Admin can add/remove categories
+
+USAGE:
+  - Read once on app load, cache in React context
+  - Admin can edit from Settings page
+  - Categories list drives dropdowns across the app
+
+--------------------------------------------------------------------------------
+FIRESTORE INDEXES NEEDED (create in Firebase Console)
+--------------------------------------------------------------------------------
+  events:       assignedTo (array) + startDate (asc)
+  events:       status + startDate (asc)
+  events:       createdBy + createdAt (desc)
+  events:       category + status
+  notifications: userId + read + createdAt (desc)
+  activityLog:  performedBy + createdAt (desc)
+  activityLog:  targetType + createdAt (desc)
+
+--------------------------------------------------------------------------------
+FIRESTORE SECURITY RULES (to be implemented)
+--------------------------------------------------------------------------------
+  users:
+    read:   authenticated users can read any user doc (for assignee display)
+    write:  user can only write their own doc (except role field)
+            admin can write any user doc
+
+  events:
+    read:   any authenticated user
+    create: admin, staff only
+    update: admin always | staff/volunteer only if uid in assignedTo
+    delete: admin only
+
+  notifications:
+    read:   only if userId == request.auth.uid
+    write:  backend only (via Admin SDK) — frontend can only update read field
+
+  activityLog:
+    read:   admin only
+    write:  any authenticated user (append only — no update/delete)
+
+  appConfig:
+    read:   any authenticated user
+    write:  admin only
+
+================================================================================
+7. NOTIFICATION SYSTEM
+================================================================================
+
+THREE CHANNELS — all active from Phase 1 web launch:
+
+A) IN-APP (Real-time)
+   - Firestore onSnapshot listener on /notifications filtered by current uid
+   - Bell icon in navbar shows unread count badge
+   - Clicking opens a slide-in notification drawer
+   - Mark as read updates the `read` field in Firestore
+
+B) MOBILE / BROWSER PUSH (FCM)
+   - Web phase: FCM Web Push (works in browser without app install)
+   - Mobile phase: FCM via @capacitor/push-notifications
+   - On login: request permission → get FCM token → save to /users/{uid}/fcmToken
+   - Flask reads this token from Firestore when sending targeted pushes
+   - FCM SDK refreshes token automatically
+
+C) EMAIL (Resend via Flask)
+   - Flask calls Resend API when triggered
+   - Free: 3,000 emails/month
+
+NOTIFICATION TRIGGERS:
+  New event created          → push + email to all assignedTo users
+  Event status changed       → push + email to createdBy + all admins
+  Event starting in 24hrs    → push + email via Flask APScheduler cron job
+  New photo uploaded         → push only to event createdBy
+  New user registered        → email only to all admins
+
+================================================================================
+8. GOOGLE CALENDAR INTEGRATION
+================================================================================
+
+CHOSEN APPROACH: Option A — Shared NGO Google Calendar (simpler, no per-user OAuth)
+  - NGO owns one Google account with a shared calendar
+  - Flask uses a Google service account to add/edit/delete events on that calendar
+  - All members subscribe to the shared NGO calendar link
+  - On export: Flask creates calendar event, stores googleCalendarEventId in Firestore
+  - Future edits update the calendar event via stored ID
+
+Option B (deferred): Per-user personal Google Calendar export
+  - Requires per-user OAuth consent flow
+  - Add this later if members want personal calendar sync
+
+NOTE: If app will have more than 100 users, Google OAuth consent screen
+      requires verification — plan 1-2 weeks for Google's review process.
+
+================================================================================
+9. LOVABLE AI TOOL — USAGE & LIMITATIONS
+================================================================================
+Lovable was used to generate the initial frontend UI shell using the project prompt.
+
+WHAT LOVABLE PRODUCES (usable as-is):
+  - Page scaffolding and component structure
+  - Tailwind styling and responsive layouts
+  - React Router setup
+  - Form UI and general interactions
+  - Visual design and component layout
+
+WHAT LOVABLE GETS WRONG (must be manually fixed before any production use):
+  - Firebase custom claims auth — it will read role from Firestore directly
+    on the frontend (WRONG + insecure). Must use getIdTokenResult() → claims.role
+  - Firestore real-time — likely uses one-time fetches, not onSnapshot listeners
+  - FCM token handling — will not request permission or save token on login
+  - Supabase Storage — upload logic may be mocked or incorrect
+  - Capacitor compatibility — may use hover-only interactions or raw window/document refs
+
+AUDIT CHECKLIST for frontend dev after receiving Lovable output:
+  [ ] firebase.js — correct Firebase v9 modular SDK syntax?
+  [ ] AuthContext — reads role from custom claims, not Firestore field?
+  [ ] ProtectedRoute — gates correctly by custom claim role?
+  [ ] All data queries — using onSnapshot (real-time) not getDocs (one-time)?
+  [ ] PhotoUploader — actual Supabase SDK upload, URL saved to Firestore?
+  [ ] Login flow — requests FCM permission, saves token to /users/{uid}/fcmToken?
+  [ ] All interactions work on tap, not just hover?
+  [ ] No raw window/document manipulation without existence checks?
+  [ ] No inline styles — Tailwind classes only?
+
+RULE: Do NOT deploy Lovable output to production without completing this audit.
+      The auth and role-gating layer is security-critical.
+
+================================================================================
+10. PROJECT FOLDER STRUCTURE
+================================================================================
+
+/ngo-calendar/
+  /frontend/                        Deployed to Vercel
+    /public/
+    /src/
+      /components/
+        Navbar.jsx                  Top nav with bell icon, user menu
+        Sidebar.jsx                 Desktop sidebar navigation
+        BottomNav.jsx               Mobile bottom tab bar
+        EventCard.jsx               Reusable event summary card
+        StatusBadge.jsx             Planned / Ongoing / Completed badge
+        PhotoUploader.jsx           Supabase direct upload component
+        NotificationBell.jsx        Bell icon with unread count + drawer
+        ProtectedRoute.jsx          Role-based route guard
+      /pages/
+        Login.jsx                   Email/password + Google OAuth
+        Dashboard.jsx               Charts, stats, upcoming events
+        Events.jsx                  Event list with filters
+        EventDetail.jsx             Full event view with photos and status
+        CreateEvent.jsx             Create form (Admin + Staff only)
+        EditEvent.jsx               Edit form (Admin + Staff only)
+        Reports.jsx                 Charts and accountability (Admin + Staff)
+        UserManagement.jsx          User list + role assignment (Admin only)
+      /hooks/
+        useAuth.js                  Auth state + role from custom claims
+        useEvents.js                Firestore event queries + onSnapshot
+        useNotifications.js         Real-time notification listener
+      /context/
+        AuthContext.jsx             Global auth state provider
+      /lib/
+        firebase.js                 Firebase app init (v9 modular)
+        supabase.js                 Supabase client init
+        fcm.js                      FCM permission request + token save
+      App.jsx                       Router setup + AuthContext wrapper
+      main.jsx
+    .env                            Firebase keys, Supabase keys (never commit)
+    vite.config.js
+    tailwind.config.js
+    package.json
+
+  /backend/                         Deployed to Render
+    app.py                          Flask app entry point
+    /routes/
+      auth.py                       POST /api/auth/set-role
+      calendar.py                   POST /api/calendar/export
+      notifications.py              Internal: email + FCM server triggers
+    /services/
+      google_calendar.py            Google Calendar API wrapper
+      firebase_admin.py             Firebase Admin SDK init + helpers
+      resend_email.py               Resend API email sender
+    requirements.txt
+    .env                            Firebase Admin key, Google API, Resend key
+
+  README.md
+  NGO_CALENDAR_PROJECT_PLAN.txt     THIS FILE — update after every major decision
+
+================================================================================
+11. DEVELOPMENT PHASES & PROGRESS
+================================================================================
+
+PHASE 1 — Core Web App (4–6 weeks)              STATUS: IN PROGRESS
+  [~] React + Vite project (Lovable generating UI shell)
+  [ ] Tailwind CSS configured correctly
+  [ ] Firebase project created (Auth + Firestore)
+  [ ] Firebase Auth: email/password + Google login
+  [ ] AuthContext reading custom claims for role
+  [ ] ProtectedRoute component
+  [ ] Flask setup on Render
+  [ ] Firebase Admin SDK in Flask
+  [ ] POST /api/auth/set-role endpoint
+  [ ] Firestore security rules (role-based)
+  [ ] Event CRUD (Firestore, real-time onSnapshot)
+  [ ] Event status updates (Planned/Ongoing/Completed)
+  [ ] FCM token request on login + saved to Firestore
+  [ ] In-app notifications (onSnapshot on /notifications)
+  [ ] Deploy frontend to Vercel
+  [ ] Deploy backend to Render + UptimeRobot setup
+  [ ] Full audit of Lovable output (see Section 9)
+
+PHASE 2 — Media, Calendar & Email (2–3 weeks)   STATUS: NOT STARTED
+  [ ] Supabase project + storage bucket setup
+  [ ] Photo upload component (Supabase JS SDK)
+  [ ] Photo gallery per event
+  [ ] Google Calendar service account setup
+  [ ] Flask Google Calendar API integration
+  [ ] POST /api/calendar/export endpoint
+  [ ] Export to Google Calendar button on EventDetail
+  [ ] Email notifications via Resend from Flask
+  [ ] FCM server-side push from Flask (APScheduler for reminders)
+
+PHASE 3 — Dashboard & Reporting (1–2 weeks)     STATUS: NOT STARTED
+  [ ] Dashboard page with Recharts
+  [ ] Donut chart: events by status
+  [ ] Bar chart: events per month
+  [ ] Pie chart: events by category
+  [ ] Upcoming events this week list
+  [ ] Staff activity leaderboard (Admin only)
+  [ ] Date range + category filters
+
+PHASE 4 — Mobile Conversion (3–4 weeks)         STATUS: NOT STARTED
+  [ ] Install Ionic Capacitor into React project
+  [ ] Add BottomNav for mobile, Sidebar for desktop
+  [ ] Replace file input with @capacitor/camera
+  [ ] Add @capacitor/push-notifications for FCM
+  [ ] Fix any hover-only or window/document issues
+  [ ] Android APK build + internal testing
+  [ ] iOS build (needs Mac + Apple Developer account — decision pending)
+
+================================================================================
+12. FREE TIER LIMITS — WATCH THESE
+================================================================================
+
+Firebase Spark (Free):
+  Firestore reads:    50,000 / day
+  Firestore writes:   20,000 / day
+  Firestore storage:  1 GB
+  Auth:               Unlimited users
+  FCM push:           Free, unlimited
+
+Supabase Free:
+  Storage:            1 GB
+  Bandwidth:          2 GB / month
+  API requests:       500,000 / month
+
+Render Free:
+  Behavior:           Spins down after 15 min idle, ~30s cold start
+  Fix:                UptimeRobot free plan, ping every 10 min
+
+Vercel Free:
+  Bandwidth:          100 GB / month
+  Deployments:        Unlimited
+  Custom domain:      Supported
+
+Resend Free:
+  Emails:             3,000 / month, 100 / day
+
+Google Calendar API:
+  Cost:               Free
+  Watch out:          OAuth consent screen verification needed for 100+ users
+                      Allow 1-2 weeks for Google review if needed
+
+================================================================================
+13. DECISIONS LOG — ALL MAJOR DECISIONS MADE SO FAR
+================================================================================
+[2026-02-18] Build web app first, convert to mobile later using Ionic Capacitor
+[2026-02-18] React + Vite chosen over Next.js (better Capacitor compatibility)
+[2026-02-18] Firebase for Auth + Firestore DB, Supabase for Storage only
+[2026-02-18] Roles: Admin, Staff/Member, Volunteer, Viewer
+[2026-02-18] Roles stored as Firebase custom claims, set server-side by Flask only
+[2026-02-18] Google Calendar: shared NGO calendar via service account (Option A first)
+[2026-02-18] Notifications: FCM Web Push + FCM Capacitor (mobile) + Resend email
+[2026-02-18] FCM push notifications active from Phase 1 (web), not deferred to mobile
+[2026-02-18] All hosting on free tier: Vercel + Render + UptimeRobot + Resend + Supabase
+[2026-02-18] Lovable used for UI shell generation — full audit required before production
+[2026-02-18] App name decided: Trackly
+[2026-02-18] Firebase project created: trackly-5ca32
+[2026-02-18] Lovable output uses TypeScript + shadcn/ui (note for frontend dev)
+[2026-02-18] Full Firestore DB designed: 5 collections — users, events, notifications, activityLog, appConfig
+[2026-02-18] activityLog is append-only audit trail for accountability reporting
+[2026-02-18] fcmTokens stored as array on user doc (multiple devices per user supported)
+[2026-02-18] events.statusHistory array tracks every status change for accountability
+[2026-02-18] Role in Firestore /users is display-only — custom claim is security source of truth
+
+================================================================================
+14. PENDING DECISIONS — NEED INPUT FROM PROJECT LEAD
+================================================================================
+[ ] NGO name and branding (name, logo, colors)
+[ ] Final color palette and design direction for the app
+[ ] Specific event categories for this education NGO
+        (e.g. Workshop, Training, Outreach, Meeting, Community Event?)
+[ ] Expected number of users (affects Firebase plan and Google OAuth review)
+[ ] iOS mobile support needed? (requires Mac + $99/yr Apple Developer account)
+[ ] Custom domain name for the web app
+[ ] Who is the first Admin user and how is the initial admin role set?
+[ ] Should volunteers self-register or be invited only?
+
+================================================================================
+16. SECURITY REMINDERS
+================================================================================
+- NEVER paste Firebase credentials into any chat, AI tool, or public forum
+- Firebase config belongs in .env file only (root of frontend project)
+- .env must be in .gitignore — never committed to GitHub
+- Vercel environment variables are set in Vercel dashboard, not in code
+- Firebase Admin SDK .json key file goes on Render backend only — never frontend
+- .env format is key=value, no quotes, no colons, no commas
+- All frontend env vars must be prefixed with VITE_ for Vite to expose them
+- If credentials are ever accidentally exposed in chat/GitHub:
+    → Go to Firebase Console → Project Settings → Your Apps
+    → Delete the web app and re-register it to get a new API key immediately
+- Firebase API keys alone are not enough for abuse IF Firestore security
+  rules are properly configured — but always rotate exposed keys anyway
+
+App name decided: Trackly
+Firebase project ID: trackly-5ca32 (re-register if credentials were exposed)
+
+================================================================================
+15. INSTRUCTIONS FOR THE LLM READING THIS FILE
+================================================================================
+- This is an active, real project being built for an education NGO.
+- Do not suggest changing the core tech stack unless explicitly asked to.
+  All decisions in Section 13 are final and reasoned.
+- When asked to write code, follow the folder structure in Section 10 exactly.
+- Always use Firebase JS SDK v9 modular syntax:
+    import { doc, getDoc } from 'firebase/firestore'   ← correct
+    firebase.firestore().doc()                          ← wrong (v8 compat syntax)
+- Roles must ALWAYS come from Firebase custom claims on the frontend:
+    const { claims } = await auth.currentUser.getIdTokenResult()
+    const role = claims.role
+  NEVER read role from Firestore directly on the frontend. This is a hard
+  security rule — a user could modify their own Firestore document.
+- All Firestore queries for live data must use onSnapshot for real-time updates,
+  not getDocs, unless it is explicitly a one-time fetch.
+- Flask is intentionally minimal. Only add new Flask endpoints if the action
+  cannot be done safely from the client side.
+- Keep Ionic Capacitor mobile compatibility in mind at ALL times:
+    - No hover-only interactions (use onClick/onTouchEnd)
+    - Mobile-first Tailwind CSS (sm: breakpoints, not desktop-first)
+    - No raw window.X or document.X without if (typeof window !== 'undefined')
+    - React Router for all navigation (no <a href> for internal routes)
+    - No inline styles anywhere
+- When the user asks what to build or fix next, refer to the earliest unchecked
+  [ ] item in the current active phase in Section 11.
+- When a session ends with new decisions or completed tasks, remind the user to:
+    1. Check off completed items in Section 11
+    2. Add new decisions to Section 13
+    3. Update the "Last Updated" date at the top
+    4. Save the updated file for next session
+
+================================================================================
+END OF CONTEXT FILE
+This file is the single source of truth for this project.
+Update it after every major decision, completed milestone, or change in direction.
+================================================================================
+
