@@ -10,7 +10,7 @@ import { db } from "@/lib/firebase";
 import { FirestoreEvent } from "@/types";
 import Layout from "@/components/layout/Layout";
 import StatusBadge from "@/components/StatusBadge";
-import { BarChartComponent, DonutChart } from "@/components/charts/Charts";
+import { BarChartComponent, DonutChart, PieChartComponent } from "@/components/charts/Charts";
 import { cn } from "@/lib/utils";
 
 const MONTH_LABELS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
@@ -79,6 +79,12 @@ export default function Reports() {
   const [startDateFilter, setStartDateFilter] = useState<string>("");
   const [endDateFilter, setEndDateFilter] = useState<string>("");
 
+  // Advanced History & Projection States
+  const [historyTimeframe, setHistoryTimeframe] = useState<"5y" | "12m">("5y");
+  const [historyCategory, setHistoryCategory] = useState<string>("All");
+  const [selectedTag, setSelectedTag] = useState<string>("All");
+  const [searchQuery, setSearchQuery] = useState<string>("");
+
   useEffect(() => {
     async function load() {
       try {
@@ -131,6 +137,104 @@ export default function Reports() {
       return start >= now && start <= nextWeek;
     }).sort((a, b) => toMs(a.startDate) - toMs(b.startDate));
   }, [events]);
+
+  // All unique tags available across all events
+  const allTags = useMemo(() => {
+    const tags = new Set<string>();
+    events.forEach(e => (e.tags || []).forEach(t => tags.add(t)));
+    return ["All", ...Array.from(tags)];
+  }, [events]);
+
+  // Advanced Timeline Data Processing with Prediction
+  const historyData = useMemo(() => {
+    const now = new Date();
+    const result: any[] = [];
+    
+    // 1. Filter events based on history filters (Keyword, Tag, Category)
+    const filtered = events.filter(e => {
+      const matchCat = historyCategory === "All" || e.category === historyCategory;
+      const matchTag = selectedTag === "All" || (e.tags || []).includes(selectedTag);
+      const matchSearch = !searchQuery || e.title.toLowerCase().includes(searchQuery.toLowerCase());
+      return matchCat && matchTag && matchSearch;
+    });
+
+    if (historyTimeframe === "5y") {
+      const currentYear = now.getFullYear();
+      for (let i = 4; i >= 0; i--) {
+        const year = currentYear - i;
+        const yearEvents = filtered.filter(e => toMs(e.startDate) && new Date(toMs(e.startDate)).getFullYear() === year);
+        
+        // Count unique participants
+        const uids = new Set<string>();
+        yearEvents.forEach(e => {
+          (e.assignedTo || []).forEach(id => uids.add(id));
+          (e.attendees || []).forEach(a => uids.add(a.uid));
+        });
+
+        // Avg Attendance Rate
+        const capped = yearEvents.filter(e => (e.capacity ?? 0) > 0);
+        const avgRate = capped.length > 0 
+          ? Math.round(capped.reduce((acc, e) => acc + Math.min(100, Math.round((new Set([...(e.assignedTo || []), ...(e.attendees || []).map(a => a.uid)]).size / e.capacity!) * 100)), 0) / capped.length)
+          : 0;
+
+        result.push({ name: String(year), participants: uids.size, attendance: avgRate, type: "actual" });
+      }
+
+      // 2. Add Prediction for next year
+      if (result.length >= 2) {
+        const last = result[result.length - 1].participants;
+        const prev = result[result.length - 2].participants;
+        const growth = prev === 0 ? 0 : (last - prev) / prev;
+        const expected = Math.round(last * (1 + growth));
+        result.push({ 
+          name: String(currentYear + 1), 
+          participants: expected, 
+          attendance: result[result.length - 1].attendance, 
+          type: "projected" 
+        });
+      }
+    } else {
+      // 12 Months
+      const currentMonth = now.getMonth();
+      const currentYear = now.getFullYear();
+      for (let i = 11; i >= 0; i--) {
+        const targetDate = new Date(currentYear, currentMonth - i, 1);
+        const m = targetDate.getMonth();
+        const y = targetDate.getFullYear();
+        const monthEvents = filtered.filter(e => {
+          const d = new Date(toMs(e.startDate));
+          return d.getMonth() === m && d.getFullYear() === y;
+        });
+
+        const uids = new Set<string>();
+        monthEvents.forEach(e => {
+          (e.assignedTo || []).forEach(id => uids.add(id));
+          (e.attendees || []).forEach(a => uids.add(a.uid));
+        });
+
+        const capped = monthEvents.filter(e => (e.capacity ?? 0) > 0);
+        const avgRate = capped.length > 0 
+          ? Math.round(capped.reduce((acc, e) => acc + Math.min(100, Math.round((new Set([...(e.assignedTo || []), ...(e.attendees || []).map(a => a.uid)]).size / e.capacity!) * 100)), 0) / capped.length)
+          : 0;
+
+        result.push({ name: MONTH_LABELS[m], participants: uids.size, attendance: avgRate, type: "actual" });
+      }
+
+      // Add Prediction for next month
+      if (result.length >= 2) {
+        const last = result[result.length - 1].participants;
+        const prev = result[result.length - 2].participants;
+        const growth = prev === 0 ? 0 : (last - prev) / prev;
+        result.push({ 
+          name: "Next", 
+          participants: Math.round(last * (1 + growth)), 
+          attendance: result[result.length - 1].attendance, 
+          type: "projected" 
+        });
+      }
+    }
+    return result;
+  }, [events, historyTimeframe, historyCategory, selectedTag, searchQuery]);
 
   const statusCounts = useMemo(() => ({
     Planned: filteredEvents.filter((e) => e.status === "Planned").length,
@@ -305,6 +409,156 @@ export default function Reports() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <DonutChart title="Events by Status" data={statusData} />
           <BarChartComponent title="Events per Month" data={monthlyData} />
+        </div>
+
+        {/* Advanced History & Projection Graph */}
+        <div className="glass-card p-4 sm:p-6 space-y-6">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <h3 className="font-semibold text-foreground text-base">History & Projection</h3>
+              <p className="text-xs text-muted-foreground mt-0.5">Timeline analytics with predictive insights</p>
+            </div>
+            <div className="flex items-center gap-1.5 glass rounded-xl p-1 w-fit">
+              <button
+                onClick={() => setHistoryTimeframe("5y")}
+                className={cn("px-3 py-1.5 rounded-lg text-xs font-medium transition-all", historyTimeframe === "5y" ? "bg-violet-600 text-white shadow-lg" : "text-muted-foreground hover:text-foreground")}
+              >
+                Last 5 Years
+              </button>
+              <button
+                onClick={() => setHistoryTimeframe("12m")}
+                className={cn("px-3 py-1.5 rounded-lg text-xs font-medium transition-all", historyTimeframe === "12m" ? "bg-violet-600 text-white shadow-lg" : "text-muted-foreground hover:text-foreground")}
+              >
+                Last 12 Months
+              </button>
+            </div>
+          </div>
+
+          {/* History Filters */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="space-y-1">
+              <label className="text-[10px] font-medium text-muted-foreground ml-1">Series Search (e.g. "Annual")</label>
+              <input 
+                type="text" 
+                placeholder="Search events..." 
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full rounded-xl border border-white/08 bg-white/03 px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-violet-500/30"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] font-medium text-muted-foreground ml-1">Filter by Tag</label>
+              <select
+                value={selectedTag}
+                onChange={(e) => setSelectedTag(e.target.value)}
+                className="w-full rounded-xl border border-white/08 bg-white/03 px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-violet-500/30"
+              >
+                {allTags.map(t => <option key={t} value={t}>{t === "All" ? "All Tags" : `#${t}`}</option>)}
+              </select>
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] font-medium text-muted-foreground ml-1">Category</label>
+              <select
+                value={historyCategory}
+                onChange={(e) => setHistoryCategory(e.target.value)}
+                className="w-full rounded-xl border border-white/08 bg-white/03 px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-violet-500/30"
+              >
+                {categories.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+          </div>
+
+          <div className="h-64 sm:h-80 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={historyData}>
+                <defs>
+                  <linearGradient id="partGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#8B5CF6" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="#8B5CF6" stopOpacity={0} />
+                  </linearGradient>
+                  <linearGradient id="rateGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#EC4899" stopOpacity={0.15} />
+                    <stop offset="95%" stopColor="#EC4899" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
+                <XAxis 
+                  dataKey="name" 
+                  tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 10 }} 
+                  axisLine={false} 
+                  tickLine={false} 
+                />
+                <YAxis 
+                  yId="left"
+                  tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 10 }} 
+                  axisLine={false} 
+                  tickLine={false} 
+                  allowDecimals={false}
+                />
+                <YAxis 
+                  yId="right"
+                  orientation="right"
+                  tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 10 }} 
+                  axisLine={false} 
+                  tickLine={false} 
+                  domain={[0, 100]}
+                  tickFormatter={(v) => `${v}%`}
+                />
+                <Tooltip 
+                  content={({ active, payload, label }) => {
+                    if (!active || !payload?.length) return null;
+                    const isProjected = payload[0].payload.type === "projected";
+                    return (
+                      <div className="glass-card !p-3 !rounded-xl border border-violet-500/20 text-xs space-y-2">
+                        <div className="flex items-center justify-between gap-4">
+                          <p className="font-semibold text-foreground">{label}</p>
+                          {isProjected && <span className="px-1.5 py-0.5 rounded-full bg-violet-500/10 text-violet-400 text-[8px] uppercase font-bold tracking-wider">Projected</span>}
+                        </div>
+                        <div className="space-y-1">
+                          <div className="flex items-center justify-between gap-4">
+                            <span className="text-muted-foreground flex items-center gap-1.5">
+                              <div className="w-1.5 h-1.5 rounded-full bg-violet-500" /> Participants
+                            </span>
+                            <span className="font-bold text-foreground">{payload[0].value}</span>
+                          </div>
+                          <div className="flex items-center justify-between gap-4">
+                            <span className="text-muted-foreground flex items-center gap-1.5">
+                              <div className="w-1.5 h-1.5 rounded-full bg-pink-500" /> Attendance
+                            </span>
+                            <span className="font-bold text-foreground">{payload[1]?.value}%</span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  }}
+                />
+                <Area 
+                  yId="left"
+                  type="monotone" 
+                  dataKey="participants" 
+                  stroke="#8B5CF6" 
+                  strokeWidth={2} 
+                  fill="url(#partGrad)"
+                  strokeDasharray={historyData.map(d => d.type === "projected" ? "5 5" : "0").join(" ")}
+                  animationDuration={1500}
+                />
+                <Area 
+                  yId="right"
+                  type="monotone" 
+                  dataKey="attendance" 
+                  stroke="#EC4899" 
+                  strokeWidth={2} 
+                  fill="url(#rateGrad)"
+                  strokeDasharray={historyData.map(d => d.type === "projected" ? "5 5" : "0").join(" ")}
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="flex items-center gap-4 text-[10px] text-muted-foreground justify-center">
+            <div className="flex items-center gap-1.5"><div className="w-2 h-0.5 bg-violet-500" /> Participants</div>
+            <div className="flex items-center gap-1.5"><div className="w-2 h-0.5 bg-pink-500" /> Attendance Rate</div>
+            <div className="flex items-center gap-1.5"><div className="w-2 h-0.5 border-t border-dashed border-violet-400" /> Predicted Trend</div>
+          </div>
         </div>
 
         {/* Upcoming Events This Week */}
@@ -544,7 +798,7 @@ export default function Reports() {
           </div>
         </div>
 
-        {catData.length > 0 && <DonutChart title="Events by Category" data={catData} />}
+        {catData.length > 0 && <PieChartComponent title="Events by Category" data={catData} />}
 
         {/* Staff table */}
         {staffData.length > 0 && (
