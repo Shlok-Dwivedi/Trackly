@@ -351,42 +351,69 @@ export default function Reports() {
           <p className="text-sm text-muted-foreground mt-0.5">Analytics and insights for your events</p>
         </div>
 
-        {/* Global Filters */}
-        <div className="glass-card p-4 flex flex-wrap gap-4 items-end">
-          <div className="space-y-1.5 flex-1 min-w-[140px]">
-            <label className="text-xs font-medium text-muted-foreground ml-1">Category</label>
-            <select
-              value={globalCategory}
-              onChange={(e) => setGlobalCategory(e.target.value)}
-              className="w-full rounded-xl border border-white/10 bg-background/50 px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-violet-500/20"
+        {/* Global Slicer & Filters */}
+        <div className="glass-card p-4 space-y-4">
+          <div className="space-y-2">
+            <label className="text-xs font-medium text-muted-foreground ml-1 flex items-center gap-2">
+              <Users className="h-3 w-3" />
+              Quick Category Filter
+            </label>
+            <div className="flex flex-wrap gap-2">
+              {categories.map((c) => (
+                <button
+                  key={c}
+                  onClick={() => setGlobalCategory(c)}
+                  className={cn(
+                    "px-4 py-2 rounded-xl text-xs font-medium transition-all duration-300 border",
+                    globalCategory === c
+                      ? "bg-violet-600 text-white border-violet-500 shadow-[0_0_15px_rgba(139,92,246,0.4)]"
+                      : "bg-white/03 border-white/08 text-muted-foreground hover:border-white/20 hover:bg-white/05"
+                  )}
+                >
+                  {c}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="h-px bg-white/05 w-full" />
+
+          <div className="flex flex-wrap gap-4 items-end">
+            <div className="space-y-1.5 flex-1 min-w-[200px]">
+              <label className="text-[10px] font-medium text-muted-foreground ml-1">Search Keywords</label>
+              <input
+                type="text"
+                placeholder="Search everything..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full rounded-xl border border-white/10 bg-background/50 px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-violet-500/20"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-muted-foreground ml-1">From</label>
+              <input
+                type="date"
+                value={startDateFilter}
+                onChange={(e) => setStartDateFilter(e.target.value)}
+                className="w-full rounded-xl border border-white/10 bg-background/50 px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-violet-500/20"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-muted-foreground ml-1">To</label>
+              <input
+                type="date"
+                value={endDateFilter}
+                onChange={(e) => setEndDateFilter(e.target.value)}
+                className="w-full rounded-xl border border-white/10 bg-background/50 px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-violet-500/20"
+              />
+            </div>
+            <button
+              onClick={() => { setGlobalCategory("All"); setStartDateFilter(""); setEndDateFilter(""); setSearchQuery(""); }}
+              className="px-4 py-2 rounded-xl bg-white/05 hover:bg-white/10 text-xs font-medium transition-colors border border-white/10"
             >
-              {categories.map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
+              Reset All
+            </button>
           </div>
-          <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground ml-1">Start Date</label>
-            <input
-              type="date"
-              value={startDateFilter}
-              onChange={(e) => setStartDateFilter(e.target.value)}
-              className="w-full rounded-xl border border-white/10 bg-background/50 px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-violet-500/20"
-            />
-          </div>
-          <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground ml-1">End Date</label>
-            <input
-              type="date"
-              value={endDateFilter}
-              onChange={(e) => setEndDateFilter(e.target.value)}
-              className="w-full rounded-xl border border-white/10 bg-background/50 px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-violet-500/20"
-            />
-          </div>
-          <button
-            onClick={() => { setGlobalCategory("All"); setStartDateFilter(""); setEndDateFilter(""); }}
-            className="px-4 py-2 rounded-xl bg-white/05 hover:bg-white/10 text-xs font-medium transition-colors"
-          >
-            Reset
-          </button>
         </div>
 
         {/* Stat cards */}
