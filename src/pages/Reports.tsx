@@ -142,9 +142,12 @@ export default function Reports() {
   // Unique event titles for autocomplete suggestions
   const suggestedTitles = useMemo(() => {
     const titles = new Set<string>();
-    events.forEach(e => { if (e.title) titles.add(e.title); });
+    events.forEach(e => { 
+      const matchCat = historyCategory === "All" || e.category === historyCategory;
+      if (e.title && matchCat) titles.add(e.title); 
+    });
     return Array.from(titles).sort();
-  }, [events]);
+  }, [events, historyCategory]);
 
   // Advanced Timeline Data Processing with Prediction
   const historyData = useMemo(() => {
@@ -476,6 +479,11 @@ export default function Reports() {
               <datalist id="event-titles">
                 {suggestedTitles.map(t => <option key={t} value={t} />)}
               </datalist>
+              {searchQuery && historyData.length === 0 && (
+                <p className="text-[10px] text-pink-400 mt-1 animate-pulse">
+                   No such event found in {historyCategory === "All" ? "any category" : historyCategory}
+                </p>
+              )}
             </div>
             <div className="space-y-1">
               <label className="text-[10px] font-medium text-muted-foreground ml-1">Category</label>
