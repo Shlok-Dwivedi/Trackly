@@ -137,8 +137,6 @@ export default function Reports() {
     }).sort((a, b) => toMs(a.startDate) - toMs(b.startDate));
   }, [events]);
 
-  }, [events]);
-
   // Unique event titles for autocomplete suggestions
   const suggestedTitles = useMemo(() => {
     const titles = new Set<string>();
