@@ -235,7 +235,7 @@ export default function Reports() {
       }
     }
     return result;
-  }, [events, historyTimeframe, historyCategory, selectedTag, searchQuery]);
+  }, [events, historyTimeframe, historyCategory, searchQuery]);
 
   const statusCounts = useMemo(() => ({
     Planned: filteredEvents.filter((e) => e.status === "Planned").length,
