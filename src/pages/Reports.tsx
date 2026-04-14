@@ -188,10 +188,15 @@ export default function Reports() {
         const prev = result[result.length - 2].participants;
         const growth = prev === 0 ? 0 : (last - prev) / prev;
         const expected = Math.round(last * (1 + growth));
+        
+        // Connect the actual line to the projected line seamlessly
+        result[result.length - 1].projected_participants = last;
+        result[result.length - 1].projected_attendance = result[result.length - 1].attendance;
+
         result.push({ 
           name: String(currentYear + 1), 
-          participants: expected, 
-          attendance: result[result.length - 1].attendance, 
+          projected_participants: expected, 
+          projected_attendance: result[result.length - 1].attendance, 
           type: "projected" 
         });
       }
@@ -227,10 +232,15 @@ export default function Reports() {
         const last = result[result.length - 1].participants;
         const prev = result[result.length - 2].participants;
         const growth = prev === 0 ? 0 : (last - prev) / prev;
+        
+        // Connect actual to projected
+        result[result.length - 1].projected_participants = last;
+        result[result.length - 1].projected_attendance = result[result.length - 1].attendance;
+
         result.push({ 
           name: "Next", 
-          participants: Math.round(last * (1 + growth)), 
-          attendance: result[result.length - 1].attendance, 
+          projected_participants: Math.round(last * (1 + growth)), 
+          projected_attendance: result[result.length - 1].attendance, 
           type: "projected" 
         });
       }
@@ -535,50 +545,41 @@ export default function Reports() {
                 <Tooltip 
                   content={({ active, payload, label }) => {
                     if (!active || !payload?.length) return null;
-                    const isProjected = payload[0].payload.type === "projected";
+                    const isProjected = payload.some(p => p.dataKey?.toString().includes("projected"));
+                    const partVal = payload.find(p => p.dataKey === "participants")?.value ?? payload.find(p => p.dataKey === "projected_participants")?.value;
+                    const attVal = payload.find(p => p.dataKey === "attendance")?.value ?? payload.find(p => p.dataKey === "projected_attendance")?.value;
                     return (
                       <div className="glass-card !p-3 !rounded-xl border border-violet-500/20 text-xs space-y-2">
                         <div className="flex items-center justify-between gap-4">
                           <p className="font-semibold text-foreground">{label}</p>
-                          {isProjected && <span className="px-1.5 py-0.5 rounded-full bg-violet-500/10 text-violet-400 text-[8px] uppercase font-bold tracking-wider">Projected</span>}
+                          {isProjected && payload[0].payload.type === "projected" && <span className="px-1.5 py-0.5 rounded-full bg-violet-500/10 text-violet-400 text-[8px] uppercase font-bold tracking-wider">Projected</span>}
                         </div>
                         <div className="space-y-1">
                           <div className="flex items-center justify-between gap-4">
                             <span className="text-muted-foreground flex items-center gap-1.5">
                               <div className="w-1.5 h-1.5 rounded-full bg-violet-500" /> Participants
                             </span>
-                            <span className="font-bold text-foreground">{payload[0].value}</span>
+                            <span className="font-bold text-foreground">{partVal}</span>
                           </div>
                           <div className="flex items-center justify-between gap-4">
                             <span className="text-muted-foreground flex items-center gap-1.5">
                               <div className="w-1.5 h-1.5 rounded-full bg-pink-500" /> Attendance
                             </span>
-                            <span className="font-bold text-foreground">{payload[1]?.value}%</span>
+                            <span className="font-bold text-foreground">{attVal}%</span>
                           </div>
                         </div>
                       </div>
                     );
                   }}
                 />
-                <Area 
-                  yId="left"
-                  type="monotone" 
-                  dataKey="participants" 
-                  stroke="#8B5CF6" 
-                  strokeWidth={2} 
-                  fill="url(#partGrad)"
-                  strokeDasharray={historyData.map(d => d.type === "projected" ? "5 5" : "0").join(" ")}
-                  animationDuration={1500}
-                />
-                <Area 
-                  yId="right"
-                  type="monotone" 
-                  dataKey="attendance" 
-                  stroke="#EC4899" 
-                  strokeWidth={2} 
-                  fill="url(#rateGrad)"
-                  strokeDasharray={historyData.map(d => d.type === "projected" ? "5 5" : "0").join(" ")}
-                />
+                
+                {/* Actual Data Lines */}
+                <Area yId="left" type="monotone" dataKey="participants" stroke="#8B5CF6" strokeWidth={2} fill="url(#partGrad)" connectNulls animationDuration={1500} />
+                <Area yId="right" type="monotone" dataKey="attendance" stroke="#EC4899" strokeWidth={2} fill="url(#rateGrad)" connectNulls />
+
+                {/* Projected Data Lines (Dashed) */}
+                <Area yId="left" type="monotone" dataKey="projected_participants" stroke="#8B5CF6" strokeWidth={2} strokeDasharray="5 5" fill="none" connectNulls animationDuration={1500} />
+                <Area yId="right" type="monotone" dataKey="projected_attendance" stroke="#EC4899" strokeWidth={2} strokeDasharray="5 5" fill="none" connectNulls />
               </AreaChart>
             </ResponsiveContainer>
           </div>
