@@ -164,7 +164,7 @@ export default function Reports() {
         const year = currentYear - i;
         const yearEvents = filtered.filter(e => {
           const ms = toMs(e.startDate);
-          return ms && new Date(ms).getFullYear() === year;
+          return ms && new Date(ms).getFullYear() === year && e.status !== "Planned";
         });
         
         // Count unique participants (Attendees only)
@@ -208,7 +208,7 @@ export default function Reports() {
         const y = targetDate.getFullYear();
         const monthEvents = filtered.filter(e => {
           const d = new Date(toMs(e.startDate));
-          return d.getMonth() === m && d.getFullYear() === y;
+          return d.getMonth() === m && d.getFullYear() === y && e.status !== "Planned";
         });
 
         const uids = new Set<string>();
