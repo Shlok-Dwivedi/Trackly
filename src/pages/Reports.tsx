@@ -164,22 +164,19 @@ export default function Reports() {
         const year = currentYear - i;
         const yearEvents = filtered.filter(e => {
           const ms = toMs(e.startDate);
-          return ms && new Date(ms).getFullYear() === year && e.status !== "Planned";
+          return ms && new Date(ms).getFullYear() === year;
         });
         
-        // Count unique participants (Attendees only)
+        // Count unique participants
         const uids = new Set<string>();
         yearEvents.forEach(e => {
+          (e.assignedTo || []).forEach(id => uids.add(id));
           (e.attendees || []).forEach(a => uids.add(a.uid));
         });
 
-        // Avg Attendance Rate
         const capped = yearEvents.filter(e => (e.capacity ?? 0) > 0);
         const avgRate = capped.length > 0 
-          ? Math.round(capped.reduce((acc, e) => {
-              const attendeesOnly = new Set((e.attendees || []).map(a => a.uid)).size;
-              return acc + Math.min(100, Math.round((attendeesOnly / e.capacity!) * 100));
-            }, 0) / capped.length)
+          ? Math.round(capped.reduce((acc, e) => acc + Math.min(100, Math.round((new Set([...(e.assignedTo || []), ...(e.attendees || []).map(a => a.uid)]).size / e.capacity!) * 100)), 0) / capped.length)
           : 0;
 
         result.push({ name: String(year), participants: uids.size, attendance: avgRate, type: "actual" });
@@ -208,20 +205,18 @@ export default function Reports() {
         const y = targetDate.getFullYear();
         const monthEvents = filtered.filter(e => {
           const d = new Date(toMs(e.startDate));
-          return d.getMonth() === m && d.getFullYear() === y && e.status !== "Planned";
+          return d.getMonth() === m && d.getFullYear() === y;
         });
 
         const uids = new Set<string>();
         monthEvents.forEach(e => {
+          (e.assignedTo || []).forEach(id => uids.add(id));
           (e.attendees || []).forEach(a => uids.add(a.uid));
         });
 
         const capped = monthEvents.filter(e => (e.capacity ?? 0) > 0);
         const avgRate = capped.length > 0 
-          ? Math.round(capped.reduce((acc, e) => {
-              const attendeesOnly = new Set((e.attendees || []).map(a => a.uid)).size;
-              return acc + Math.min(100, Math.round((attendeesOnly / e.capacity!) * 100));
-            }, 0) / capped.length)
+          ? Math.round(capped.reduce((acc, e) => acc + Math.min(100, Math.round((new Set([...(e.assignedTo || []), ...(e.attendees || []).map(a => a.uid)]).size / e.capacity!) * 100)), 0) / capped.length)
           : 0;
 
         result.push({ name: MONTH_LABELS[m], participants: uids.size, attendance: avgRate, type: "actual" });
@@ -253,6 +248,7 @@ export default function Reports() {
   const totalParticipants = useMemo(() => {
     const seen = new Set<string>();
     filteredEvents.forEach((e) => {
+      (e.assignedTo || []).forEach((id: string) => seen.add(id));
       (e.attendees || []).forEach((a: { uid: string }) => seen.add(a.uid));
     });
     return seen.size;
@@ -746,8 +742,9 @@ export default function Reports() {
               {(() => {
                 // Shared metric builder — same 4 metrics for all 3 modes
                 const metrics = (evList: FirestoreEvent[], label: string, color: string) => {
-                  // Count unique participants (Attendees only)
+                  // Count unique participants: assignedTo UIDs + attendee UIDs (deduped)
                   const allUids = new Set([
+                    ...evList.flatMap((e) => e.assignedTo || []),
                     ...evList.flatMap((e) => (e.attendees || []).map((a: {uid:string}) => a.uid)),
                   ]);
                   const participants = allUids.size;
