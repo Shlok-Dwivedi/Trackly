@@ -8,7 +8,7 @@ import {
 } from "recharts";
 import {
   Calendar, CheckCircle, Clock, Loader2, Plus,
-  MapPin, Sparkles, CalendarDays, Users,
+  MapPin, CalendarDays, Users, Info,
 } from "lucide-react";
 import {
   format, startOfMonth, endOfMonth, eachDayOfInterval,
@@ -327,7 +327,7 @@ export default function Dashboard() {
           <div className="relative z-10">
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2">
-                <Sparkles className="h-5 w-5 text-violet-500 animate-pulse" />
+                <Info className="h-5 w-5 text-violet-500" />
                 <span className="text-sm font-medium text-violet-500">
                   {format(new Date(), "EEEE, MMMM d, yyyy")}
                 </span>
@@ -350,15 +350,9 @@ export default function Dashboard() {
               </span>
               {", "}
               <span className="text-foreground">{firstName}</span>
-              {" "}
-              <motion.span className="inline-block"
-                animate={{ rotate: [0, 14, -8, 14, -4, 10, 0] }}
-                transition={{ duration: 2.5, delay: 0.5 }}>
-                👋
-              </motion.span>
             </h1>
             <p className="text-muted-foreground mt-1 text-base sm:text-lg max-w-2xl">
-              Here's what's happening with your events.
+              Here's a quick look at what's coming up.
             </p>
           </div>
         </motion.div>
@@ -380,7 +374,7 @@ export default function Dashboard() {
             {todayEvents.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-8 text-center">
                 <Calendar className="h-8 w-8 text-muted-foreground/40 mb-2" />
-                <p className="text-sm text-muted-foreground">No events scheduled for today</p>
+                <p className="text-sm text-muted-foreground">Looks like you have a clear day—nothing on the calendar for today.</p>
               </div>
             ) : (
               <div className="space-y-2">
@@ -480,7 +474,7 @@ export default function Dashboard() {
               })}
             </div>
             <div className="mt-5 pt-4 border-t border-border/50 flex items-center justify-between">
-              <span className="text-xs text-muted-foreground">Total events tracked</span>
+              <span className="text-xs text-muted-foreground">Keep up the good work.</span>
               <span className="text-lg font-bold text-foreground">{events.length}</span>
             </div>
           </motion.div>
@@ -512,10 +506,10 @@ export default function Dashboard() {
           initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.8 }}
           className="flex items-center justify-center pt-4">
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Sparkles className="h-4 w-4 text-violet-500" />
+            <Info className="h-4 w-4 text-violet-500" />
             <span>Trackly Dashboard</span>
             <span className="text-violet-500">•</span>
-            <span>Making a difference together</span>
+            <span>Keep up the good work.</span>
           </div>
         </motion.div>
 

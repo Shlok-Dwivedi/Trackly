@@ -10,7 +10,7 @@ import {
   ChevronLeft,
   Moon,
   Sun,
-  Zap,
+  LayoutDashboard,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import NotificationBell from "@/components/NotificationBell";
@@ -99,7 +99,7 @@ export default function Sidebar() {
               transition={{ duration: 0.2 }}
             >
               <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-violet-500 to-purple-700">
-                <Zap className="h-4 w-4 text-white" />
+                <LayoutDashboard className="h-4 w-4 text-white" />
               </div>
               <div className="min-w-0">
                 <p className="text-sm font-bold text-white leading-tight truncate">Trackly</p>
@@ -113,7 +113,7 @@ export default function Sidebar() {
 
         {collapsed && (
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-violet-500 to-purple-700 mx-auto">
-            <Zap className="h-4 w-4 text-white" />
+            <LayoutDashboard className="h-4 w-4 text-white" />
           </div>
         )}
 
