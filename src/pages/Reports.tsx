@@ -189,14 +189,19 @@ export default function Reports() {
         const growth = prev === 0 ? 0 : (last - prev) / prev;
         const expected = Math.round(last * (1 + growth));
         
+        const lastAtt = result[result.length - 1].attendance;
+        const prevAtt = result[result.length - 2].attendance;
+        const attGrowth = prevAtt === 0 ? 0 : (lastAtt - prevAtt) / prevAtt;
+        const expectedAtt = Math.round(Math.min(100, lastAtt * (1 + attGrowth)));
+
         // Connect the actual line to the projected line seamlessly
         result[result.length - 1].projected_participants = last;
-        result[result.length - 1].projected_attendance = result[result.length - 1].attendance;
+        result[result.length - 1].projected_attendance = lastAtt;
 
         result.push({ 
           name: String(currentYear + 1), 
           projected_participants: expected, 
-          projected_attendance: result[result.length - 1].attendance, 
+          projected_attendance: expectedAtt, 
           type: "projected" 
         });
       }
@@ -233,14 +238,19 @@ export default function Reports() {
         const prev = result[result.length - 2].participants;
         const growth = prev === 0 ? 0 : (last - prev) / prev;
         
+        const lastAtt = result[result.length - 1].attendance;
+        const prevAtt = result[result.length - 2].attendance;
+        const attGrowth = prevAtt === 0 ? 0 : (lastAtt - prevAtt) / prevAtt;
+        const expectedAtt = Math.round(Math.min(100, lastAtt * (1 + attGrowth)));
+
         // Connect actual to projected
         result[result.length - 1].projected_participants = last;
-        result[result.length - 1].projected_attendance = result[result.length - 1].attendance;
+        result[result.length - 1].projected_attendance = lastAtt;
 
         result.push({ 
           name: "Next", 
           projected_participants: Math.round(last * (1 + growth)), 
-          projected_attendance: result[result.length - 1].attendance, 
+          projected_attendance: expectedAtt, 
           type: "projected" 
         });
       }
