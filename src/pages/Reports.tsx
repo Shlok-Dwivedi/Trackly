@@ -34,7 +34,6 @@ function buildVolunteerData(events: FirestoreEvent[]) {
     if (!ms) return;
     const m = new Date(ms).getMonth();
     if (!map[m]) map[m] = new Set();
-    (e.assignedTo || []).forEach((uid: string) => map[m].add(uid));
     (e.attendees || []).forEach((a: { uid: string }) => map[m].add(a.uid));
   });
   const currentMonth = new Date().getMonth();
@@ -163,12 +162,14 @@ export default function Reports() {
       const currentYear = now.getFullYear();
       for (let i = 4; i >= 0; i--) {
         const year = currentYear - i;
-        const yearEvents = filtered.filter(e => toMs(e.startDate) && new Date(toMs(e.startDate)).getFullYear() === year);
+        const yearEvents = filtered.filter(e => {
+          const ms = toMs(e.startDate);
+          return ms && new Date(ms).getFullYear() === year;
+        });
         
-        // Count unique participants
+        // Count unique participants (Attendees only)
         const uids = new Set<string>();
         yearEvents.forEach(e => {
-          (e.assignedTo || []).forEach(id => uids.add(id));
           (e.attendees || []).forEach(a => uids.add(a.uid));
         });
 
@@ -209,7 +210,6 @@ export default function Reports() {
 
         const uids = new Set<string>();
         monthEvents.forEach(e => {
-          (e.assignedTo || []).forEach(id => uids.add(id));
           (e.attendees || []).forEach(a => uids.add(a.uid));
         });
 
@@ -247,7 +247,6 @@ export default function Reports() {
   const totalParticipants = useMemo(() => {
     const seen = new Set<string>();
     filteredEvents.forEach((e) => {
-      (e.assignedTo || []).forEach((id: string) => seen.add(id));
       (e.attendees || []).forEach((a: { uid: string }) => seen.add(a.uid));
     });
     return seen.size;
@@ -741,9 +740,8 @@ export default function Reports() {
               {(() => {
                 // Shared metric builder — same 4 metrics for all 3 modes
                 const metrics = (evList: FirestoreEvent[], label: string, color: string) => {
-                  // Count unique participants: assignedTo UIDs + attendee UIDs (deduped)
+                  // Count unique participants (Attendees only)
                   const allUids = new Set([
-                    ...evList.flatMap((e) => e.assignedTo || []),
                     ...evList.flatMap((e) => (e.attendees || []).map((a: {uid:string}) => a.uid)),
                   ]);
                   const participants = allUids.size;
