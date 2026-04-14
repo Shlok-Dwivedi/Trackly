@@ -207,3 +207,68 @@ export function DonutChart({ data, title, className }: { data: DonutData[]; titl
     </div>
   );
 }
+
+export function PieChartComponent({ data, title, className }: { data: DonutData[]; title: string; className?: string }) {
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [selected, setSelected] = useState<(DonutData & { color: string; percent: number }) | null>(null);
+
+  const coloredData = useMemo(() => data.map((d, i) => ({ ...d, color: d.color || DONUT_COLORS[i % DONUT_COLORS.length] })), [data]);
+  const total = useMemo(() => coloredData.reduce((s, d) => s + d.value, 0), [coloredData]);
+
+  const onEnter = useCallback((_: unknown, i: number) => setActiveIndex(i), []);
+  const onClickSlice = useCallback((_: unknown, i: number) => {
+    const e = coloredData[i];
+    setSelected({ ...e, percent: total > 0 ? (e.value / total) * 100 : 0 });
+  }, [coloredData, total]);
+
+  return (
+    <div className={cn("glass-card p-4 sm:p-6 relative", className)}>
+      <h3 className="font-semibold mb-4 text-foreground">{title}</h3>
+      <div className="h-64 relative">
+        {total === 0 ? (
+          <div className="flex flex-col items-center justify-center h-full gap-3">
+            <p className="text-sm text-muted-foreground">No events yet</p>
+          </div>
+        ) : (
+          <ResponsiveContainer width="100%" height="100%">
+            <PieChart>
+              <Pie
+                {...({ activeIndex, activeShape: ActiveShape } as Record<string, unknown>)}
+                data={coloredData} cx="50%" cy="50%"
+                innerRadius={0} outerRadius={80} dataKey="value"
+                onMouseEnter={onEnter} onClick={onClickSlice}
+                animationDuration={1200} animationEasing="ease-out" stroke="hsl(var(--background))" strokeWidth={2}
+              >
+                {coloredData.map((e, i) => <Cell key={i} fill={e.color} style={{ cursor: "pointer" }} />)}
+              </Pie>
+              <Tooltip content={<DonutTooltip />} />
+              <Legend verticalAlign="bottom" height={36} iconType="circle" iconSize={8}
+                formatter={(v: string) => <span className="text-xs text-muted-foreground font-medium">{v}</span>} />
+            </PieChart>
+          </ResponsiveContainer>
+        )}
+        <AnimatePresence>
+          {selected && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.85 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.85 }}
+              transition={{ duration: 0.2 }}
+              className="absolute inset-0 flex items-center justify-center z-20"
+            >
+              <div className="glass-card p-4 rounded-xl relative text-center min-w-[160px] shadow-2xl border border-violet-500/20">
+                <button onClick={() => setSelected(null)} className="absolute top-2 right-2 p-1 rounded-full hover:bg-white/10 transition-colors">
+                  <X className="h-3.5 w-3.5 text-muted-foreground" />
+                </button>
+                <div className="flex items-center justify-center gap-2 mb-1">
+                  <div className="w-3 h-3 rounded-full" style={{ background: selected.color }} />
+                  <p className="text-sm text-muted-foreground">{selected.name}</p>
+                </div>
+                <p className="text-3xl font-bold text-foreground">{selected.value}</p>
+                <p className="text-xs text-muted-foreground mt-1">{selected.percent.toFixed(1)}% of total</p>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    </div>
+  );
+}
