@@ -176,7 +176,10 @@ export default function Reports() {
         // Avg Attendance Rate
         const capped = yearEvents.filter(e => (e.capacity ?? 0) > 0);
         const avgRate = capped.length > 0 
-          ? Math.round(capped.reduce((acc, e) => acc + Math.min(100, Math.round((new Set([...(e.assignedTo || []), ...(e.attendees || []).map(a => a.uid)]).size / e.capacity!) * 100)), 0) / capped.length)
+          ? Math.round(capped.reduce((acc, e) => {
+              const attendeesOnly = new Set((e.attendees || []).map(a => a.uid)).size;
+              return acc + Math.min(100, Math.round((attendeesOnly / e.capacity!) * 100));
+            }, 0) / capped.length)
           : 0;
 
         result.push({ name: String(year), participants: uids.size, attendance: avgRate, type: "actual" });
@@ -215,7 +218,10 @@ export default function Reports() {
 
         const capped = monthEvents.filter(e => (e.capacity ?? 0) > 0);
         const avgRate = capped.length > 0 
-          ? Math.round(capped.reduce((acc, e) => acc + Math.min(100, Math.round((new Set([...(e.assignedTo || []), ...(e.attendees || []).map(a => a.uid)]).size / e.capacity!) * 100)), 0) / capped.length)
+          ? Math.round(capped.reduce((acc, e) => {
+              const attendeesOnly = new Set((e.attendees || []).map(a => a.uid)).size;
+              return acc + Math.min(100, Math.round((attendeesOnly / e.capacity!) * 100));
+            }, 0) / capped.length)
           : 0;
 
         result.push({ name: MONTH_LABELS[m], participants: uids.size, attendance: avgRate, type: "actual" });
