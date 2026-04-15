@@ -112,7 +112,7 @@ export default function Login() {
           </div>
 
           <div className="mb-7 text-center">
-            <h2 className="text-2xl font-extrabold text-white">
+            <h2 className="text-2xl font-extrabold" style={{ color: "#ffffff" }}>
               {isSignup ? "Create Account" : "Hey there, good to see you again"}
             </h2>
             <p className="mt-1 text-sm text-slate-500">
@@ -161,8 +161,8 @@ export default function Login() {
             )}
 
             <button type="submit" disabled={submitting}
-              className="flex w-full items-center justify-center gap-2 rounded-2xl py-3 text-sm font-bold text-white transition-all hover:opacity-90 active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed mt-1"
-              style={{ background: "linear-gradient(90deg, #6366f1 0%, #a855f7 50%, #ec4899 100%)" }}>
+              className="flex w-full items-center justify-center gap-2 rounded-2xl py-3 text-sm font-bold transition-all hover:opacity-90 active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed mt-1"
+              style={{ background: "linear-gradient(90deg, #6366f1 0%, #a855f7 50%, #ec4899 100%)", color: "#ffffff" }}>
               {submitting
                 ? <Loader2 className="h-4 w-4 animate-spin" />
                 : <>{isSignup ? "Create Account" : "Sign In"} <ArrowRight className="h-4 w-4" /></>}
@@ -176,8 +176,8 @@ export default function Login() {
           </div>
 
           <button type="button" onClick={handleGoogle} disabled={googleLoading}
-            className="flex w-full items-center justify-center gap-3 rounded-2xl py-3 text-sm font-medium text-slate-300 transition-all hover:bg-white/10 active:scale-[0.98] disabled:opacity-60"
-            style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.09)" }}>
+            className="flex w-full items-center justify-center gap-3 rounded-2xl py-3 text-sm font-medium transition-all hover:bg-white/10 active:scale-[0.98] disabled:opacity-60"
+            style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.09)", color: "#d1d5db" }}>
             {googleLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : (
               <svg className="h-4 w-4" viewBox="0 0 24 24">
                 <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
@@ -189,7 +189,7 @@ export default function Login() {
             Continue with Google
           </button>
 
-          <p className="mt-6 text-center text-xs text-slate-600">
+          <p className="mt-6 text-center text-xs" style={{ color: "#94a3b8" }}>
             {isSignup ? "Already have an account? " : "Don't have an account? "}
             <button type="button"
               onClick={() => { setIsSignup(!isSignup); setError(null); }}
