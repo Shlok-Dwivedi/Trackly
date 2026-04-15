@@ -1,19 +1,12 @@
 import { useState } from "react";
 import { Navigate } from "react-router-dom";
-import { Mail, Lock, Loader2, Eye, EyeOff, User, Zap, BookOpen, Lightbulb, Pencil, ArrowRight } from "lucide-react";
+import { Mail, Lock, Loader2, Eye, EyeOff, User, LayoutDashboard, ArrowRight } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
-import { FloatingLetters } from "@/components/effects/FloatingLetters";
 
-const FLOAT_ICONS = [
-  { Icon: BookOpen,      top: "12%",  left: "6%",   size: 22, opacity: 0.18, delay: 0    },
-  { Icon: Zap, top: "18%",  left: "52%",  size: 28, opacity: 0.15, delay: 0.3  },
-  { Icon: Pencil,        top: "62%",  left: "48%",  size: 20, opacity: 0.12, delay: 0.6  },
-  { Icon: Lightbulb,     top: "72%",  left: "8%",   size: 24, opacity: 0.14, delay: 0.9  },
-  { Icon: BookOpen,      top: "38%",  left: "74%",  size: 18, opacity: 0.10, delay: 1.2  },
-  { Icon: Zap, top: "85%",  left: "62%",  size: 20, opacity: 0.11, delay: 0.5  },
-];
+
+
 
 const inputCls = cn(
   "w-full rounded-2xl py-3 pl-11 pr-4 text-sm text-white outline-none transition-all",
@@ -77,17 +70,7 @@ export default function Login() {
   return (
     <div className="relative flex min-h-screen w-full items-center overflow-hidden" style={{ background: "#0a0a0f" }}>
 
-      {/* Floating letters effect — only on login */}
-      <FloatingLetters maxLetters={15} spawnRate={150} minDistance={30} sizeRange={[14, 26]} lifetime={2500} />
 
-      {/* Floating icons */}
-      {FLOAT_ICONS.map(({ Icon, top, left, size, opacity, delay }, i) => (
-        <motion.div key={i} className="pointer-events-none absolute" style={{ top, left, opacity }}
-          animate={{ y: [0, -10, 0] }}
-          transition={{ duration: 4 + i * 0.5, repeat: Infinity, delay, ease: "easeInOut" }}>
-          <Icon size={size} className="text-slate-400" />
-        </motion.div>
-      ))}
 
       {/* Left — logo */}
       <div className="hidden md:flex flex-col items-center justify-center w-1/2 px-12 gap-6">
@@ -98,7 +81,7 @@ export default function Login() {
           style={{ background: "linear-gradient(135deg, #7C3AED 0%, #EC4899 100%)" }}>
           <div className="absolute inset-0 rounded-full blur-2xl opacity-40"
             style={{ background: "linear-gradient(135deg, #7C3AED, #EC4899)" }} />
-          <Zap className="relative z-10 h-24 w-24 text-white drop-shadow-xl" />
+          <LayoutDashboard className="relative z-10 h-24 w-24 text-white drop-shadow-xl" />
         </motion.div>
 
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
@@ -107,7 +90,7 @@ export default function Login() {
             style={{ background: "linear-gradient(90deg, #a78bfa, #ec4899)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
             Trackly
           </h1>
-          <p className="mt-2 text-sm text-slate-500 max-w-xs"></p>
+          <p className="mt-2 text-sm text-slate-500 max-w-xs">Simple tools for better coordination.</p>
         </motion.div>
       </div>
 
@@ -123,17 +106,17 @@ export default function Login() {
           <div className="mb-6 flex flex-col items-center gap-2 md:hidden">
             <div className="flex h-14 w-14 items-center justify-center rounded-2xl"
               style={{ background: "linear-gradient(135deg, #7C3AED, #EC4899)" }}>
-              <Zap className="h-7 w-7 text-white" />
+              <LayoutDashboard className="h-7 w-7 text-white" />
             </div>
             <span className="text-lg font-bold text-white">Trackly</span>
           </div>
 
           <div className="mb-7 text-center">
             <h2 className="text-2xl font-extrabold text-white">
-              {isSignup ? "Create Account" : "Welcome Back!"}
+              {isSignup ? "Create Account" : "Hey there, good to see you again"}
             </h2>
             <p className="mt-1 text-sm text-slate-500">
-              {isSignup ? "Sign up to get started" : "Sign in to manage your events"}
+              {isSignup ? "Sign up to get started" : "Go ahead and sign in to get to your dashboard"}
             </p>
           </div>
 
