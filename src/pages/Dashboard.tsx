@@ -3,9 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import {
   collection, query, orderBy, limit, onSnapshot, where,
 } from "firebase/firestore";
-import {
-  AreaChart, Area, ResponsiveContainer,
-} from "recharts";
+
 import {
   Calendar, CheckCircle, Clock, Loader2, Plus,
   MapPin, CalendarDays, Users, Info,
@@ -60,33 +58,12 @@ function useAnimatedCounter(endValue: number, duration = 1500) {
   return count;
 }
 
-// ── Mini sparkline ─────────────────────────────────────────────────────────────
-function MiniSparkline({ data, color }: { data: number[]; color: string }) {
-  const id = `spark-${color.replace("#", "")}`;
-  return (
-    <div className="h-10 w-full mt-2">
-      <ResponsiveContainer width="100%" height="100%">
-        <AreaChart data={data.map((v, i) => ({ v, i }))}>
-          <defs>
-            <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%"   stopColor={color} stopOpacity={0.3} />
-              <stop offset="100%" stopColor={color} stopOpacity={0.05} />
-            </linearGradient>
-          </defs>
-          <Area type="monotone" dataKey="v" stroke={color} strokeWidth={2}
-            fill={`url(#${id})`} dot={false} isAnimationActive={false} />
-        </AreaChart>
-      </ResponsiveContainer>
-    </div>
-  );
-}
+
 
 // ── Stat card ──────────────────────────────────────────────────────────────────
-function StatCard({ label, value, icon: Icon, gradient,
-  sparklineData, sparklineColor }: {
+function StatCard({ label, value, icon: Icon, gradient }: {
   label: string; value: number; icon: React.ElementType;
   gradient: string;
-  sparklineData?: number[]; sparklineColor?: string;
 }) {
   const animated = useAnimatedCounter(value);
   return (
@@ -100,7 +77,6 @@ function StatCard({ label, value, icon: Icon, gradient,
         <p className="text-2xl sm:text-3xl font-bold text-foreground">{animated.toLocaleString()}</p>
         <p className="text-xs text-muted-foreground mt-1 font-medium">{label}</p>
       </div>
-      {sparklineData && sparklineColor && <MiniSparkline data={sparklineData} color={sparklineColor} />}
     </div>
   );
 }
@@ -277,11 +253,7 @@ export default function Dashboard() {
     if (normalizeStatus(e.status) === "Completed") monthlyCompleted[m] = (monthlyCompleted[m] ?? 0) + 1;
     if (normalizeStatus(e.status) === "Planned")   monthlyPlanned[m]   = (monthlyPlanned[m]   ?? 0) + 1;
   });
-  const sparkTotal     = MONTH_LABELS.map((_, i) => monthly[i] ?? 0);
-  const sparkCompleted = MONTH_LABELS.map((_, i) => monthlyCompleted[i] ?? 0);
-  const sparkPlanned   = MONTH_LABELS.map((_, i) => monthlyPlanned[i] ?? 0);
-  // Volunteers is a single live count — flat line at that value
-  const sparkVolunteers = MONTH_LABELS.map(() => volunteers);
+
   const barData = MONTH_LABELS.map((name, i) => ({ name, value: monthly[i] ?? 0 }));
 
   const todayEvents = useMemo(() => {
@@ -400,13 +372,13 @@ export default function Dashboard() {
         {/* ── Stat Cards ── */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
           <StatCard label="Total Events"  value={events.length}   icon={CalendarDays}
-            gradient="from-violet-500 to-purple-600" sparklineColor="#8B5CF6" sparklineData={sparkTotal} />
+            gradient="from-violet-500 to-purple-600" />
           <StatCard label="Volunteers"    value={volunteers}      icon={Users}
-            gradient="from-pink-500 to-rose-500"     sparklineColor="#EC4899" sparklineData={sparkVolunteers} />
+            gradient="from-pink-500 to-rose-500" />
           <StatCard label="Completed"     value={completed}       icon={CheckCircle}
-            gradient="from-cyan-500 to-sky-500"      sparklineColor="#06B6D4" sparklineData={sparkCompleted} />
+            gradient="from-cyan-500 to-sky-500" />
           <StatCard label="Upcoming (7d)" value={upcoming.length} icon={Clock}
-            gradient="from-emerald-500 to-green-500" sparklineColor="#10B981" sparklineData={sparkPlanned} />
+            gradient="from-emerald-500 to-green-500" />
         </div>
 
         {/* ── Analytics Overview ── */}
