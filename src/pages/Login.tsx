@@ -61,14 +61,14 @@ export default function Login() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center" style={{ background: "#0a0a0f" }}>
+      <div className="dark flex min-h-screen items-center justify-center" style={{ background: "#0a0a0f" }}>
         <Loader2 className="h-8 w-8 animate-spin text-violet-500" />
       </div>
     );
   }
 
   return (
-    <div className="relative flex min-h-screen w-full items-center overflow-hidden" style={{ background: "#0a0a0f" }}>
+    <div className="dark relative flex min-h-screen w-full items-center overflow-hidden" style={{ background: "#0a0a0f", color: "#ffffff" }}>
 
 
 
